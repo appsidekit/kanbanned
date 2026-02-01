@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DELETE_ZONE_ID } from "@/lib/dnd";
 
 interface DeleteZoneProps {
   isVisible: boolean;
@@ -10,7 +11,7 @@ interface DeleteZoneProps {
 
 export function DeleteZone({ isVisible }: DeleteZoneProps) {
   const { isOver, setNodeRef } = useDroppable({
-    id: "delete-zone",
+    id: DELETE_ZONE_ID,
   });
 
   if (!isVisible) return null;

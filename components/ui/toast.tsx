@@ -50,27 +50,27 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
           <div
             key={t.id}
             className={cn(
-              "pointer-events-auto flex items-start gap-3 rounded-xl border p-4 shadow-lg backdrop-blur-md animate-toast-in",
-              t.type === "success" && "bg-emerald-50/90 border-emerald-200 text-emerald-900 dark:bg-emerald-950/90 dark:border-emerald-700 dark:text-emerald-100",
-              t.type === "error" && "bg-rose-50/90 border-rose-200 text-rose-900 dark:bg-rose-950/90 dark:border-rose-700 dark:text-rose-100",
-              t.type === "warning" && "bg-amber-50/90 border-amber-200 text-amber-900 dark:bg-amber-950/90 dark:border-amber-700 dark:text-amber-100",
-              t.type === "info" && "bg-stone-50/90 border-stone-200 text-stone-900 dark:bg-stone-900/90 dark:border-stone-600 dark:text-stone-100"
+              "pointer-events-auto flex items-start gap-3 rounded-md border p-4 shadow-lg shadow-black/25 backdrop-blur-xl animate-toast-in",
+              t.type === "success" && "bg-emerald-500/20 border-emerald-500/30 text-emerald-100",
+              t.type === "error" && "bg-rose-500/20 border-rose-500/30 text-rose-100",
+              t.type === "warning" && "bg-amber-500/20 border-amber-500/30 text-amber-100",
+              t.type === "info" && "bg-white/10 border-white/10 text-stone-100"
             )}
           >
             <div className="mt-0.5 shrink-0">
-              {t.type === "success" && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
-              {t.type === "error" && <AlertCircle className="h-5 w-5 text-rose-500" />}
-              {t.type === "warning" && <AlertTriangle className="h-5 w-5 text-amber-500" />}
-              {t.type === "info" && <Info className="h-5 w-5 text-stone-500" />}
+              {t.type === "success" && <CheckCircle2 className="h-5 w-5 text-emerald-400" />}
+              {t.type === "error" && <AlertCircle className="h-5 w-5 text-rose-400" />}
+              {t.type === "warning" && <AlertTriangle className="h-5 w-5 text-amber-400" />}
+              {t.type === "info" && <Info className="h-5 w-5 text-stone-400" />}
             </div>
             <div className="flex-1 text-sm font-medium leading-relaxed">
               {t.message}
             </div>
             <button
               onClick={() => removeToast(t.id)}
-              className="mt-0.5 rounded-lg p-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              className="mt-0.5 rounded-md p-1 hover:bg-white/10 transition-colors"
             >
-              <X className="h-4 w-4 opacity-50" />
+              <X className="h-4 w-4 opacity-60" />
             </button>
           </div>
         ))}

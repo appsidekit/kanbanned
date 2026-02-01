@@ -4,8 +4,9 @@ import { useDroppable } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Column } from "./Column";
-import { SortableCard } from "./SortableCard";
+import { CardZone } from "./CardZone";
 import { CardData, ColumnData, Tag } from "@/lib/types";
+import { createColumnDropId } from "@/lib/dnd";
 
 interface SortableColumnProps {
   column: ColumnData;
@@ -13,59 +14,6 @@ interface SortableColumnProps {
   onNameChange?: (columnId: string, name: string) => void;
   onCardClick?: (card: CardData) => void;
   onAddCard?: (columnId: string, title: string) => void;
-}
-
-interface TagZoneProps {
-  columnId: string;
-  tag: Tag;
-  cards: CardData[];
-  onCardClick?: (card: CardData) => void;
-}
-
-function TagZone({ columnId, tag, cards, onCardClick }: TagZoneProps) {
-  return (
-    <div className="mt-2 space-y-2">
-      <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-muted-foreground">
-        <span
-          className="w-2 h-2 rounded-full"
-          style={{ backgroundColor: tag.color }}
-        />
-        <span>{tag.name}</span>
-        <span className="opacity-50">({cards.length})</span>
-      </div>
-      {cards.map((card) => (
-        <SortableCard
-          key={card.id}
-          card={card}
-          columnId={columnId}
-          zoneTagId={tag.id}
-          onCardClick={onCardClick}
-        />
-      ))}
-    </div>
-  );
-}
-
-interface UntaggedZoneProps {
-  columnId: string;
-  cards: CardData[];
-  onCardClick?: (card: CardData) => void;
-}
-
-function UntaggedZone({ columnId, cards, onCardClick }: UntaggedZoneProps) {
-  return (
-    <div className="space-y-2 min-h-[8px]">
-      {cards.map((card) => (
-        <SortableCard
-          key={card.id}
-          card={card}
-          columnId={columnId}
-          zoneTagId={null}
-          onCardClick={onCardClick}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
@@ -79,7 +27,7 @@ export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddC
   } = useSortable({ id: column.id });
 
   const { setNodeRef: setDroppableRef } = useDroppable({
-    id: `column-${column.id}`,
+    id: createColumnDropId(column.id),
     data: { columnId: column.id },
   });
 
@@ -121,7 +69,7 @@ export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddC
           strategy={verticalListSortingStrategy}
         >
           {/* Untagged cards zone */}
-          <UntaggedZone
+          <CardZone
             columnId={column.id}
             cards={untaggedCards}
             onCardClick={onCardClick}
@@ -131,7 +79,7 @@ export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddC
           {tagsInColumn.map((tag) => {
             const tagCards = column.cards.filter((c) => c.tagId === tag.id);
             return (
-              <TagZone
+              <CardZone
                 key={tag.id}
                 columnId={column.id}
                 tag={tag}

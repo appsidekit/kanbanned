@@ -26,7 +26,8 @@ import { DeleteZone } from "@/components/board/DeleteZone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CardModal } from "@/components/board/CardModal";
 import { loadAppData, saveAppDataDebounced, flushPendingSave, generateId, defaultBoard, LoadResult } from "@/lib/storage";
-import { AppData, CardData, ColumnData, Tag, TAG_COLORS } from "@/lib/types";
+import { AppData, BoardData, CardData, ColumnData, Tag, TAG_COLORS } from "@/lib/types";
+import { DELETE_ZONE_ID, POINTER_SENSOR_OPTIONS, TOUCH_SENSOR_OPTIONS } from "@/lib/dnd";
 import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
@@ -54,17 +55,8 @@ export default function HomePage() {
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 5,
-      },
-    })
+    useSensor(PointerSensor, POINTER_SENSOR_OPTIONS),
+    useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS)
   );
 
   // Load data from localStorage on mount (client-side only)
@@ -363,86 +355,65 @@ export default function HomePage() {
     return selectedBoard?.columns.some((col) => col.id === id) ?? false;
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const activeId = String(active.id);
+  // Board state update helper
+  const updateBoard = (updater: (board: BoardData) => BoardData) => {
+    if (!appData) return;
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId ? updater(b) : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+    return newData;
+  };
 
-    if (isColumnId(activeId)) {
-      setIsDraggingColumn(true);
-      const column = selectedBoard?.columns.find((c) => c.id === activeId);
-      setActiveColumn(column || null);
-    } else {
-      // Only track card drags for overlay
-      const column = findColumnContainingCard(activeId);
-      const card = column?.cards.find((c) => c.id === activeId);
-      setActiveCard(card || null);
+  const handleColumnDeletion = (columnId: string) => {
+    if (!selectedBoard) return;
+    const column = selectedBoard.columns.find((c) => c.id === columnId);
+    if (column) {
+      setColumnToDelete(column);
     }
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveCard(null);
-    setActiveColumn(null);
-    setIsDraggingColumn(false);
-    const { active, over } = event;
+  const handleColumnReorder = (activeId: string, overId: string) => {
+    if (!selectedBoard || activeId === overId) return;
 
-    if (!appData || !over || !selectedBoard) return;
+    const oldIndex = selectedBoard.columns.findIndex((c) => c.id === activeId);
+    const newIndex = selectedBoard.columns.findIndex((c) => c.id === overId);
 
-    const activeId = String(active.id);
-    const overId = String(over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
 
-    // Handle column deletion
-    if (isColumnId(activeId) && overId === "delete-zone") {
-      const column = selectedBoard.columns.find((c) => c.id === activeId);
-      if (column) {
-        setColumnToDelete(column);
-      }
-      return;
-    }
+    const newColumns = arrayMove(selectedBoard.columns, oldIndex, newIndex);
+    updateBoard((board) => ({ ...board, columns: newColumns }));
+  };
 
-    // Handle card deletion
-    if (!isColumnId(activeId) && overId === "delete-zone") {
-      handleCardDelete(activeId);
-      return;
-    }
+  const handleCardMove = (activeId: string, over: { id: string | number; data: { current?: unknown } }) => {
+    if (!selectedBoard) return;
 
-    // Handle column reordering
-    if (isColumnId(activeId)) {
-      if (activeId === overId) return;
-
-      const oldIndex = selectedBoard.columns.findIndex((c) => c.id === activeId);
-      const newIndex = selectedBoard.columns.findIndex((c) => c.id === overId);
-
-      if (oldIndex === -1 || newIndex === -1) return;
-
-      const newColumns = arrayMove(selectedBoard.columns, oldIndex, newIndex);
-
-      const newData = {
-        ...appData,
-        boards: appData.boards.map((b) =>
-          b.id === selectedBoardId ? { ...b, columns: newColumns } : b
-        ),
-      };
-
-      setAppData(newData);
-      handleSave(newData);
-      return;
-    }
-
-    // Handle card reordering/moving
     const activeColumn = findColumnContainingCard(activeId);
     if (!activeColumn) return;
+
+    const overId = String(over.id);
 
     // Determine target column and tag assignment
     let targetColumnId: string | undefined;
     let newTagId: string | null | undefined = undefined; // undefined = no change, null = remove tag
+    let droppedOnCard = false; // true if dropped on a specific card (allows reordering)
 
     // Get droppable data from the element we're dropping on
     const overData = over.data.current as { type?: string; columnId?: string; zoneTagId?: string | null } | undefined;
 
-    if (overData?.type === "card" && overData.columnId) {
-      // Dropping on a card - use its zone data
+    if (overData?.type === "zone" && overData.columnId) {
+      // Dropping on a swim lane zone - no reordering, just change tag
       targetColumnId = overData.columnId;
       newTagId = overData.zoneTagId ?? null;
+    } else if (overData?.type === "card" && overData.columnId) {
+      // Dropping on a card - use its zone data, allow reordering
+      targetColumnId = overData.columnId;
+      newTagId = overData.zoneTagId ?? null;
+      droppedOnCard = true;
     } else if (overId.startsWith("column-")) {
       // Check if dropping on a column droppable area
       targetColumnId = overId.replace("column-", "");
@@ -470,45 +441,61 @@ export default function HomePage() {
         : { ...activeCard, tagId: newTagId }
       : activeCard;
 
-    // Same column reordering
+    // Notify user if tag was auto-changed due to swim lane move
+    if (newTagId !== undefined && newTagId !== activeCard.tagId) {
+      const oldTagName = selectedBoard.tags.find((t) => t.id === activeCard.tagId)?.name;
+      const newTagName = newTagId ? selectedBoard.tags.find((t) => t.id === newTagId)?.name : null;
+
+      if (oldTagName && newTagName) {
+        toast(`Tag changed from "${oldTagName}" to "${newTagName}"`, "info");
+      } else if (oldTagName && !newTagName) {
+        toast(`Tag "${oldTagName}" removed`, "info");
+      } else if (!oldTagName && newTagName) {
+        toast(`Tag "${newTagName}" applied`, "info");
+      }
+    }
+
+    // Check if tag is actually changing
+    const isTagChanging = newTagId !== undefined && newTagId !== activeCard.tagId;
+
+    // Same column
     if (activeColumn.id === targetColumn.id) {
       const oldIndex = activeColumn.cards.findIndex((c) => c.id === activeId);
-      const newIndex = activeColumn.cards.findIndex((c) => c.id === overId);
 
-      // If tag changed but position didn't, still update
-      if (oldIndex === newIndex && newTagId === undefined) return;
-
+      // Only allow reordering if dropped on a card AND staying in same zone
       let newCards: CardData[];
-      if (oldIndex !== newIndex && newIndex !== -1) {
-        newCards = arrayMove(activeColumn.cards, oldIndex, newIndex).map((c) =>
-          c.id === activeId ? movedCard : c
-        );
-      } else {
+      if (droppedOnCard && !isTagChanging) {
+        const newIndex = activeColumn.cards.findIndex((c) => c.id === overId);
+        if (oldIndex === newIndex) return; // No change
+        if (newIndex !== -1) {
+          newCards = arrayMove(activeColumn.cards, oldIndex, newIndex).map((c) =>
+            c.id === activeId ? movedCard : c
+          );
+        } else {
+          return; // Dropped on card but can't find it
+        }
+      } else if (isTagChanging) {
+        // Changing zones - just update the tag, keep position
         newCards = activeColumn.cards.map((c) =>
           c.id === activeId ? movedCard : c
         );
+      } else {
+        return; // No meaningful change
       }
 
-      const newColumns = selectedBoard.columns.map((col) =>
-        col.id === activeColumn.id ? { ...col, cards: newCards } : col
-      );
-
-      const newData = {
-        ...appData,
-        boards: appData.boards.map((b) =>
-          b.id === selectedBoardId ? { ...b, columns: newColumns } : b
+      updateBoard((board) => ({
+        ...board,
+        columns: board.columns.map((col) =>
+          col.id === activeColumn.id ? { ...col, cards: newCards } : col
         ),
-      };
-
-      setAppData(newData);
-      handleSave(newData);
+      }));
     } else {
       // Moving card to different column
       const sourceCards = activeColumn.cards.filter((c) => c.id !== activeId);
 
-      // Find insertion index in target column
+      // Only allow reordering if dropped on a card in the same zone
       let insertIndex = targetColumn.cards.length;
-      if (!overId.startsWith("column-") && !isColumnId(overId)) {
+      if (droppedOnCard && !isTagChanging) {
         const overIndex = targetColumn.cards.findIndex((c) => c.id === overId);
         if (overIndex !== -1) {
           insertIndex = overIndex;
@@ -518,26 +505,66 @@ export default function HomePage() {
       const targetCards = [...targetColumn.cards];
       targetCards.splice(insertIndex, 0, movedCard);
 
-      const newColumns = selectedBoard.columns.map((col) => {
-        if (col.id === activeColumn.id) {
-          return { ...col, cards: sourceCards };
-        }
-        if (col.id === targetColumn.id) {
-          return { ...col, cards: targetCards };
-        }
-        return col;
-      });
-
-      const newData = {
-        ...appData,
-        boards: appData.boards.map((b) =>
-          b.id === selectedBoardId ? { ...b, columns: newColumns } : b
-        ),
-      };
-
-      setAppData(newData);
-      handleSave(newData);
+      updateBoard((board) => ({
+        ...board,
+        columns: board.columns.map((col) => {
+          if (col.id === activeColumn.id) {
+            return { ...col, cards: sourceCards };
+          }
+          if (col.id === targetColumn.id) {
+            return { ...col, cards: targetCards };
+          }
+          return col;
+        }),
+      }));
     }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const activeId = String(active.id);
+
+    if (isColumnId(activeId)) {
+      setIsDraggingColumn(true);
+      const column = selectedBoard?.columns.find((c) => c.id === activeId);
+      setActiveColumn(column || null);
+    } else {
+      // Only track card drags for overlay
+      const column = findColumnContainingCard(activeId);
+      const card = column?.cards.find((c) => c.id === activeId);
+      setActiveCard(card || null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveCard(null);
+    setActiveColumn(null);
+    setIsDraggingColumn(false);
+
+    const { active, over } = event;
+    if (!appData || !over || !selectedBoard) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Deletion
+    if (overId === DELETE_ZONE_ID) {
+      if (isColumnId(activeId)) {
+        handleColumnDeletion(activeId);
+      } else {
+        handleCardDelete(activeId);
+      }
+      return;
+    }
+
+    // Column reordering
+    if (isColumnId(activeId)) {
+      handleColumnReorder(activeId, overId);
+      return;
+    }
+
+    // Card movement
+    handleCardMove(activeId, over);
   };
 
   // Wait for client-side data load

@@ -96,7 +96,9 @@ export function Column({ title, count = 0, children, className, dragHandleProps,
       </div>
       <div ref={droppableRef} className="flex-1 px-2 pb-2 space-y-2 overflow-y-auto min-h-[100px]">
         {children}
-        {onAddCard && <GhostCard visible={isHovered} onAddCard={onAddCard} />}
+        {onAddCard && (
+          <GhostCard visible={isHovered} onAddCard={onAddCard} />
+        )}
       </div>
     </div>
   );

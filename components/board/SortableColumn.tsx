@@ -15,6 +15,59 @@ interface SortableColumnProps {
   onAddCard?: (columnId: string, title: string) => void;
 }
 
+interface TagZoneProps {
+  columnId: string;
+  tag: Tag;
+  cards: CardData[];
+  onCardClick?: (card: CardData) => void;
+}
+
+function TagZone({ columnId, tag, cards, onCardClick }: TagZoneProps) {
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-muted-foreground">
+        <span
+          className="w-2 h-2 rounded-full"
+          style={{ backgroundColor: tag.color }}
+        />
+        <span>{tag.name}</span>
+        <span className="opacity-50">({cards.length})</span>
+      </div>
+      {cards.map((card) => (
+        <SortableCard
+          key={card.id}
+          card={card}
+          columnId={columnId}
+          zoneTagId={tag.id}
+          onCardClick={onCardClick}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface UntaggedZoneProps {
+  columnId: string;
+  cards: CardData[];
+  onCardClick?: (card: CardData) => void;
+}
+
+function UntaggedZone({ columnId, cards, onCardClick }: UntaggedZoneProps) {
+  return (
+    <div className="space-y-2 min-h-[8px]">
+      {cards.map((card) => (
+        <SortableCard
+          key={card.id}
+          card={card}
+          columnId={columnId}
+          zoneTagId={null}
+          onCardClick={onCardClick}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
   const {
     attributes,
@@ -67,28 +120,24 @@ export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddC
           items={sortedCards.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          {/* Untagged cards - no header */}
-          {untaggedCards.map((card) => (
-            <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
-          ))}
+          {/* Untagged cards zone */}
+          <UntaggedZone
+            columnId={column.id}
+            cards={untaggedCards}
+            onCardClick={onCardClick}
+          />
 
           {/* Tagged groups with headers */}
           {tagsInColumn.map((tag) => {
             const tagCards = column.cards.filter((c) => c.tagId === tag.id);
             return (
-              <div key={tag.id} className="mt-2">
-                <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-muted-foreground">
-                  <span
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: tag.color }}
-                  />
-                  <span>{tag.name}</span>
-                  <span className="opacity-50">({tagCards.length})</span>
-                </div>
-                {tagCards.map((card) => (
-                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
-                ))}
-              </div>
+              <TagZone
+                key={tag.id}
+                columnId={column.id}
+                tag={tag}
+                cards={tagCards}
+                onCardClick={onCardClick}
+              />
             );
           })}
         </SortableContext>

@@ -27,8 +27,8 @@ export function Card({ title, priority, hasDescription, className }: CardProps) 
       )}
     >
       <div className="flex items-start gap-2">
-        <p className="text-sm text-foreground flex-1">{title}</p>
-        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+        <p className="text-sm text-foreground flex-1 leading-5">{title}</p>
+        <div className="flex items-center gap-1.5 shrink-0 h-5">
           {hasDescription && (
             <AlignLeft className="w-3 h-3 text-muted-foreground" />
           )}

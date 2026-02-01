@@ -7,10 +7,12 @@ import { CardData } from "@/lib/types";
 
 interface SortableCardProps {
   card: CardData;
+  columnId: string;
+  zoneTagId: string | null; // null for untagged zone
   onCardClick?: (card: CardData) => void;
 }
 
-export function SortableCard({ card, onCardClick }: SortableCardProps) {
+export function SortableCard({ card, columnId, zoneTagId, onCardClick }: SortableCardProps) {
   const {
     attributes,
     listeners,
@@ -18,7 +20,10 @@ export function SortableCard({ card, onCardClick }: SortableCardProps) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: card.id });
+  } = useSortable({
+    id: card.id,
+    data: { type: "card", columnId, zoneTagId },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),

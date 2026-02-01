@@ -293,13 +293,44 @@ export default function HomePage() {
     return newTag;
   };
 
-  const handleAddCard = (columnId: string, title: string) => {
+  const handleAddCard = (columnId: string, input: string) => {
     if (!appData) return;
+
+    // Parse [tagname] syntax from start of input
+    let tagId: string | undefined;
+    let newTag: Tag | null = null;
+    let title = input;
+    const tagMatch = input.match(/^\[([^\]]+)\]\s*/);
+    if (tagMatch) {
+      const tagName = tagMatch[1].trim();
+      if (tagName) {
+        // Find the current board to check for existing tags
+        const board = appData.boards.find((b) => b.id === selectedBoardId);
+        const existingTag = board?.tags.find(
+          (t) => t.name.toLowerCase() === tagName.toLowerCase()
+        );
+        if (existingTag) {
+          tagId = existingTag.id;
+        } else if (board) {
+          newTag = {
+            id: generateId("tag"),
+            name: tagName,
+            color: TAG_COLORS[board.tags.length % TAG_COLORS.length],
+          };
+          tagId = newTag.id;
+        }
+      }
+      title = input.slice(tagMatch[0].length);
+    }
+
+    if (!title.trim()) return;
+
     const newCard: CardData = {
       id: generateId("card"),
-      title,
+      title: title.trim(),
       description: "",
       priority: "low",
+      ...(tagId && { tagId }),
     };
 
     const newData = {
@@ -308,6 +339,7 @@ export default function HomePage() {
         b.id === selectedBoardId
           ? {
               ...b,
+              tags: newTag ? [...b.tags, newTag] : b.tags,
               columns: b.columns.map((col) =>
                 col.id === columnId
                   ? { ...col, cards: [...col.cards, newCard] }
@@ -400,17 +432,25 @@ export default function HomePage() {
     const activeColumn = findColumnContainingCard(activeId);
     if (!activeColumn) return;
 
-    // Determine target column
+    // Determine target column and tag assignment
     let targetColumnId: string | undefined;
+    let newTagId: string | null | undefined = undefined; // undefined = no change, null = remove tag
 
-    // Check if dropping on a column droppable area
-    if (overId.startsWith("column-")) {
+    // Get droppable data from the element we're dropping on
+    const overData = over.data.current as { type?: string; columnId?: string; zoneTagId?: string | null } | undefined;
+
+    if (overData?.type === "card" && overData.columnId) {
+      // Dropping on a card - use its zone data
+      targetColumnId = overData.columnId;
+      newTagId = overData.zoneTagId ?? null;
+    } else if (overId.startsWith("column-")) {
+      // Check if dropping on a column droppable area
       targetColumnId = overId.replace("column-", "");
     } else if (isColumnId(overId)) {
       // Dropping on the column itself
       targetColumnId = overId;
     } else {
-      // Dropping on another card - find which column it's in
+      // Fallback - find which column the card is in
       const overColumn = findColumnContainingCard(overId);
       targetColumnId = overColumn?.id;
     }
@@ -423,14 +463,31 @@ export default function HomePage() {
     const activeCard = activeColumn.cards.find((c) => c.id === activeId);
     if (!activeCard) return;
 
+    // Prepare the card with potentially updated tag
+    const movedCard: CardData = newTagId !== undefined
+      ? newTagId === null
+        ? { ...activeCard, tagId: undefined }
+        : { ...activeCard, tagId: newTagId }
+      : activeCard;
+
     // Same column reordering
     if (activeColumn.id === targetColumn.id) {
       const oldIndex = activeColumn.cards.findIndex((c) => c.id === activeId);
       const newIndex = activeColumn.cards.findIndex((c) => c.id === overId);
 
-      if (oldIndex === newIndex) return;
+      // If tag changed but position didn't, still update
+      if (oldIndex === newIndex && newTagId === undefined) return;
 
-      const newCards = arrayMove(activeColumn.cards, oldIndex, newIndex);
+      let newCards: CardData[];
+      if (oldIndex !== newIndex && newIndex !== -1) {
+        newCards = arrayMove(activeColumn.cards, oldIndex, newIndex).map((c) =>
+          c.id === activeId ? movedCard : c
+        );
+      } else {
+        newCards = activeColumn.cards.map((c) =>
+          c.id === activeId ? movedCard : c
+        );
+      }
 
       const newColumns = selectedBoard.columns.map((col) =>
         col.id === activeColumn.id ? { ...col, cards: newCards } : col
@@ -459,7 +516,7 @@ export default function HomePage() {
       }
 
       const targetCards = [...targetColumn.cards];
-      targetCards.splice(insertIndex, 0, activeCard);
+      targetCards.splice(insertIndex, 0, movedCard);
 
       const newColumns = selectedBoard.columns.map((col) => {
         if (col.id === activeColumn.id) {

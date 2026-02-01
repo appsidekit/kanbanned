@@ -103,12 +103,24 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && hasChanges) {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
               className="w-full bg-transparent text-2xl font-semibold text-foreground focus:outline-none placeholder:text-muted-foreground"
               placeholder="Untitled"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && hasChanges) {
+                  e.preventDefault();
+                  handleSave();
+                }
+              }}
               rows={6}
               className="w-full bg-transparent text-sm text-foreground focus:outline-none resize-none placeholder:text-muted-foreground"
               placeholder="Add notes..."

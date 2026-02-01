@@ -50,17 +50,19 @@ export function GhostCard({ visible, onAddCard }: GhostCardProps) {
 
   if (isEditing) {
     return (
-      <div className="rounded-md bg-card border border-white/[0.06] px-3 py-2.5">
-        <input
-          ref={inputRef}
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onBlur={() => handleSave()}
-          placeholder="Card title..."
-          className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground"
-        />
+      <div className="mt-4 pt-3 border-t border-white/[0.06]">
+        <div className="rounded-md bg-card border border-white/[0.06] px-3 py-2.5">
+          <input
+            ref={inputRef}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => handleSave()}
+            placeholder="Card title..."
+            className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground"
+          />
+        </div>
       </div>
     );
   }

@@ -227,7 +227,7 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
             )}
           >
             <LayoutGrid className="h-4 w-4 shrink-0" />
-            {!isCollapsed && <span>Boards</span>}
+            {!isCollapsed && <span>Board</span>}
           </button>
         </nav>
 

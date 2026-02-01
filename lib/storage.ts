@@ -4,52 +4,160 @@ const STORAGE_KEY = "kanbanned-data";
 
 const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
 
-function isValidPriority(value: unknown): value is Priority {
-  return typeof value === "string" && VALID_PRIORITIES.includes(value as Priority);
+// Schema-based normalization
+type FieldDef<T> = {
+  check: (v: unknown) => v is T;
+  fallback: T;
+};
+
+type Schema = Record<string, FieldDef<unknown>>;
+
+function normalize<T extends { id: string }>(
+  raw: { id: string },
+  schema: Schema,
+  extra: Partial<T> = {}
+): { result: T; recovered: boolean } {
+  const obj = raw as Record<string, unknown>;
+  const result: Record<string, unknown> = { id: raw.id, ...extra };
+  let recovered = false;
+
+  for (const [key, def] of Object.entries(schema)) {
+    if (def.check(obj[key])) {
+      result[key] = obj[key];
+    } else {
+      result[key] = def.fallback;
+      recovered = true;
+    }
+  }
+
+  return { result: result as T, recovered };
 }
 
-function isValidCard(card: unknown): card is CardData {
-  if (typeof card !== "object" || card === null) return false;
-  const c = card as Record<string, unknown>;
-  return (
-    typeof c.id === "string" &&
-    typeof c.title === "string" &&
-    typeof c.description === "string" &&
-    isValidPriority(c.priority)
-  );
+// Type checkers
+const isString = (v: unknown): v is string => typeof v === "string";
+const isOptionalString = (v: unknown): v is string | undefined =>
+  v === undefined || typeof v === "string";
+const isValidPriority = (v: unknown): v is Priority =>
+  typeof v === "string" && VALID_PRIORITIES.includes(v as Priority);
+
+// Schemas define valid fields and their fallback values
+const cardSchema: Schema = {
+  title: { check: isString, fallback: "Untitled" },
+  description: { check: isString, fallback: "" },
+  priority: { check: isValidPriority, fallback: "medium" as Priority },
+};
+
+const columnSchema: Schema = {
+  name: { check: isString, fallback: "Untitled Column" },
+};
+
+const boardSchema: Schema = {
+  name: { check: isString, fallback: "Untitled Board" },
+  emoji: { check: isOptionalString, fallback: undefined },
+};
+
+// Helpers
+function hasId(obj: unknown): obj is { id: string } {
+  return typeof obj === "object" && obj !== null && typeof (obj as Record<string, unknown>).id === "string";
 }
 
-function isValidColumn(column: unknown): column is ColumnData {
-  if (typeof column !== "object" || column === null) return false;
-  const col = column as Record<string, unknown>;
-  return (
-    typeof col.id === "string" &&
-    typeof col.name === "string" &&
-    Array.isArray(col.cards) &&
-    col.cards.every(isValidCard)
-  );
+function getArray(obj: unknown, field: string): unknown[] | null {
+  if (typeof obj !== "object" || obj === null) return null;
+  const arr = (obj as Record<string, unknown>)[field];
+  return Array.isArray(arr) ? arr : null;
 }
 
-function isValidBoard(board: unknown): board is BoardData {
-  if (typeof board !== "object" || board === null) return false;
-  const b = board as Record<string, unknown>;
-  return (
-    typeof b.id === "string" &&
-    typeof b.name === "string" &&
-    (b.emoji === undefined || typeof b.emoji === "string") &&
-    Array.isArray(b.columns) &&
-    b.columns.every(isValidColumn)
-  );
-}
-
-function isValidAppData(data: unknown): data is AppData {
+function isValidAppDataStructure(data: unknown): data is { version: number; boards: unknown[] } {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
-  return (
-    typeof d.version === "number" &&
-    Array.isArray(d.boards) &&
-    d.boards.every(isValidBoard)
-  );
+  return typeof d.version === "number" && Array.isArray(d.boards);
+}
+
+export type LoadResult = {
+  data: AppData;
+  discarded: {
+    cards: number;
+    columns: number;
+    boards: number;
+  };
+  recovered: {
+    cards: number;
+    columns: number;
+    boards: number;
+  };
+  usedDefaults: boolean;
+};
+
+// Sanitize data by keeping valid items and discarding invalid ones
+function sanitizeAppData(raw: unknown): LoadResult {
+  const discarded = { cards: 0, columns: 0, boards: 0 };
+  const recovered = { cards: 0, columns: 0, boards: 0 };
+
+  if (!isValidAppDataStructure(raw)) {
+    return { data: defaultAppData, discarded, recovered, usedDefaults: true };
+  }
+
+  const validBoards: BoardData[] = [];
+
+  for (const rawBoard of raw.boards) {
+    if (!hasId(rawBoard)) {
+      discarded.boards++;
+      continue;
+    }
+
+    const rawColumns = getArray(rawBoard, "columns");
+    const validColumns: ColumnData[] = [];
+
+    // Missing columns array counts as recovery
+    if (!rawColumns) {
+      recovered.boards++;
+    }
+
+    for (const rawColumn of rawColumns ?? []) {
+      if (!hasId(rawColumn)) {
+        discarded.columns++;
+        continue;
+      }
+
+      const rawCards = getArray(rawColumn, "cards");
+      const validCards: CardData[] = [];
+
+      // Missing cards array counts as recovery
+      if (!rawCards) {
+        recovered.columns++;
+      }
+
+      for (const rawCard of rawCards ?? []) {
+        if (!hasId(rawCard)) {
+          discarded.cards++;
+          continue;
+        }
+
+        const card = normalize<CardData>(rawCard, cardSchema);
+        validCards.push(card.result);
+        if (card.recovered) recovered.cards++;
+      }
+
+      const col = normalize<ColumnData>(rawColumn, columnSchema, { cards: validCards });
+      validColumns.push(col.result);
+      if (col.recovered) recovered.columns++;
+    }
+
+    const board = normalize<BoardData>(rawBoard, boardSchema, { columns: validColumns });
+    validBoards.push(board.result);
+    if (board.recovered) recovered.boards++;
+  }
+
+  if (validBoards.length === 0) {
+    return { data: defaultAppData, discarded, recovered, usedDefaults: true };
+  }
+
+  return {
+    data: { version: raw.version, boards: validBoards },
+    discarded,
+    recovered,
+    usedDefaults: false,
+  };
 }
 
 export const defaultBoard: BoardData = {
@@ -137,28 +245,21 @@ export const defaultAppData: AppData = {
   boards: [defaultBoard],
 };
 
-export function loadAppData(): AppData {
+export function loadAppData(): LoadResult {
   if (typeof window === "undefined") {
-    return defaultAppData;
+    return { data: defaultAppData, discarded: { cards: 0, columns: 0, boards: 0 }, recovered: { cards: 0, columns: 0, boards: 0 }, usedDefaults: false };
   }
 
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      return defaultAppData;
+      return { data: defaultAppData, discarded: { cards: 0, columns: 0, boards: 0 }, recovered: { cards: 0, columns: 0, boards: 0 }, usedDefaults: false };
     }
     const parsed = JSON.parse(stored);
-    if (!isValidAppData(parsed)) {
-      console.warn("Invalid app data structure in localStorage, using defaults");
-      return defaultAppData;
-    }
-    if (parsed.boards.length === 0) {
-      return defaultAppData;
-    }
-    return parsed;
+    return sanitizeAppData(parsed);
   } catch (error) {
     console.error("Failed to load app data:", error);
-    return defaultAppData;
+    return { data: defaultAppData, discarded: { cards: 0, columns: 0, boards: 0 }, recovered: { cards: 0, columns: 0, boards: 0 }, usedDefaults: true };
   }
 }
 
@@ -180,4 +281,59 @@ export function saveAppData(data: AppData): SaveResult {
     console.error("Failed to save app data:", error);
     return { success: false, error: "unknown" };
   }
+}
+
+// Debounced save implementation
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let pendingData: AppData | null = null;
+let pendingCallback: ((result: SaveResult) => void) | null = null;
+
+export function saveAppDataDebounced(
+  data: AppData,
+  onComplete?: (result: SaveResult) => void,
+  delay: number = 300
+): void {
+  pendingData = data;
+  if (onComplete) {
+    pendingCallback = onComplete;
+  }
+
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+
+  saveTimeout = setTimeout(() => {
+    if (pendingData) {
+      const result = saveAppData(pendingData);
+      if (pendingCallback) {
+        pendingCallback(result);
+      }
+      pendingData = null;
+      pendingCallback = null;
+    }
+    saveTimeout = null;
+  }, delay);
+}
+
+// Flush any pending debounced save immediately
+export function flushPendingSave(): SaveResult | null {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  if (pendingData) {
+    const result = saveAppData(pendingData);
+    if (pendingCallback) {
+      pendingCallback(result);
+    }
+    pendingData = null;
+    pendingCallback = null;
+    return result;
+  }
+  return null;
+}
+
+// Generate unique IDs
+export function generateId(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID()}`;
 }

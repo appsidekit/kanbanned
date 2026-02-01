@@ -7,9 +7,10 @@ import { CardData } from "@/lib/types";
 
 interface SortableCardProps {
   card: CardData;
+  onCardClick?: (card: CardData) => void;
 }
 
-export function SortableCard({ card }: SortableCardProps) {
+export function SortableCard({ card, onCardClick }: SortableCardProps) {
   const {
     attributes,
     listeners,
@@ -25,9 +26,22 @@ export function SortableCard({ card }: SortableCardProps) {
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Only trigger click if not dragging (drag has distance threshold of 8px)
+    if (onCardClick) {
+      onCardClick(card);
+    }
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <Card title={card.title} />
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={handleClick}
+    >
+      <Card title={card.title} priority={card.priority} hasDescription={!!card.description} />
     </div>
   );
 }

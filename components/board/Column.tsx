@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { GripVertical } from "lucide-react";
+import { GhostCard } from "./GhostCard";
 
 interface ColumnProps {
   title: string;
@@ -12,11 +13,13 @@ interface ColumnProps {
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   droppableRef?: (node: HTMLElement | null) => void;
   onNameChange?: (name: string) => void;
+  onAddCard?: () => void;
 }
 
-export function Column({ title, count = 0, children, className, dragHandleProps, droppableRef, onNameChange }: ColumnProps) {
+export function Column({ title, count = 0, children, className, dragHandleProps, droppableRef, onNameChange, onAddCard }: ColumnProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(title);
+  const [isHovered, setIsHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -53,6 +56,8 @@ export function Column({ title, count = 0, children, className, dragHandleProps,
         "min-h-[calc(100vh-3rem)]",
         className
       )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center justify-between px-3 py-3">
         <div className="flex items-center gap-1">
@@ -88,6 +93,7 @@ export function Column({ title, count = 0, children, className, dragHandleProps,
       </div>
       <div ref={droppableRef} className="flex-1 px-2 pb-2 space-y-2 overflow-y-auto min-h-[100px]">
         {children}
+        {onAddCard && <GhostCard visible={isHovered} onAddCard={onAddCard} />}
       </div>
     </div>
   );

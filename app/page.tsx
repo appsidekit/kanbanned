@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -23,29 +23,38 @@ import { Sidebar } from "@/components/board/Sidebar";
 import { GhostColumn } from "@/components/board/GhostColumn";
 import { DeleteZone } from "@/components/board/DeleteZone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { loadAppData, saveAppData, defaultAppData, defaultBoard } from "@/lib/storage";
+import { CardModal } from "@/components/board/CardModal";
+import { loadAppData, saveAppDataDebounced, flushPendingSave, generateId, defaultBoard, LoadResult } from "@/lib/storage";
 import { AppData, CardData, ColumnData } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
-  const [appData, setAppData] = useState<AppData>(defaultAppData);
-  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
-  const [isLoaded, setIsLoaded] = useState(false);
+  // Load data synchronously on first render - no loading screen needed
+  const loadResultRef = useRef<LoadResult | null>(null);
+  if (loadResultRef.current === null) {
+    loadResultRef.current = loadAppData();
+  }
+  const initialResult = loadResultRef.current;
+
+  const [appData, setAppData] = useState<AppData>(initialResult.data);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>(initialResult.data.boards[0]?.id || "");
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
   const [activeColumn, setActiveColumn] = useState<ColumnData | null>(null);
   const [isDraggingColumn, setIsDraggingColumn] = useState(false);
   const [columnToDelete, setColumnToDelete] = useState<ColumnData | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
   const { toast } = useToast();
 
   const handleSave = (data: AppData) => {
-    const result = saveAppData(data);
-    if (!result.success) {
-      if (result.error === "quota_exceeded") {
-        toast("Storage full. Your changes may not be saved. Try deleting some boards or cards.", "error");
-      } else {
-        toast("Failed to save changes. Please try again.", "error");
+    saveAppDataDebounced(data, (result) => {
+      if (!result.success) {
+        if (result.error === "quota_exceeded") {
+          toast("Storage full. Your changes may not be saved. Try deleting some boards or cards.", "error");
+        } else {
+          toast("Failed to save changes. Please try again.", "error");
+        }
       }
-    }
+    });
   };
 
   const sensors = useSensors(
@@ -57,34 +66,56 @@ export default function HomePage() {
   );
 
   useEffect(() => {
-    try {
-      const data = loadAppData();
-      setAppData(data);
-      setSelectedBoardId(data.boards[0]?.id || "");
-    } catch (error) {
-      console.error("Failed to load app data:", error);
-      setAppData(defaultAppData);
-      setSelectedBoardId(defaultAppData.boards[0]?.id || "");
-    } finally {
-      setIsLoaded(true);
+    // Notify user if data was recovered or reset
+    const { discarded, recovered, usedDefaults } = initialResult;
+    const totalDiscarded = discarded.cards + discarded.columns + discarded.boards;
+    const totalRecovered = recovered.cards + recovered.columns + recovered.boards;
+
+    if (usedDefaults && totalDiscarded === 0 && totalRecovered === 0) {
+      // Complete reset due to parse error or invalid structure
+      toast("Could not load saved data. Starting fresh.", "error");
+    } else if (totalDiscarded > 0) {
+      const parts: string[] = [];
+      if (discarded.boards > 0) parts.push(`${discarded.boards} board${discarded.boards > 1 ? "s" : ""}`);
+      if (discarded.columns > 0) parts.push(`${discarded.columns} column${discarded.columns > 1 ? "s" : ""}`);
+      if (discarded.cards > 0) parts.push(`${discarded.cards} card${discarded.cards > 1 ? "s" : ""}`);
+      toast(`Removed ${parts.join(", ")} due to invalid data.`, "error");
+    } else if (totalRecovered > 0) {
+      const parts: string[] = [];
+      if (recovered.boards > 0) parts.push(`${recovered.boards} board${recovered.boards > 1 ? "s" : ""}`);
+      if (recovered.columns > 0) parts.push(`${recovered.columns} column${recovered.columns > 1 ? "s" : ""}`);
+      if (recovered.cards > 0) parts.push(`${recovered.cards} card${recovered.cards > 1 ? "s" : ""}`);
+      toast(`Fixed ${parts.join(", ")} with missing data.`, "warning");
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Flush pending saves on unmount or page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      flushPendingSave();
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      flushPendingSave();
+    };
   }, []);
 
   const selectedBoard = appData.boards.find((b) => b.id === selectedBoardId);
 
   const handleBoardChange = (boardId: string) => {
     if (boardId === "__new__") {
-      const timestamp = Date.now();
       const newBoard = {
         ...defaultBoard,
-        id: `board-${timestamp}`,
+        id: generateId("board"),
         name: `New Board`,
-        columns: defaultBoard.columns.map((col, colIndex) => ({
+        columns: defaultBoard.columns.map((col) => ({
           ...col,
-          id: `col-${timestamp}-${colIndex}`,
-          cards: col.cards.map((card, cardIndex) => ({
+          id: generateId("col"),
+          cards: col.cards.map((card) => ({
             ...card,
-            id: `card-${timestamp}-${colIndex}-${cardIndex}`,
+            id: generateId("card"),
           })),
         })),
       };
@@ -125,9 +156,8 @@ export default function HomePage() {
   const handleAddColumn = () => {
     if (!selectedBoard) return;
 
-    const timestamp = Date.now();
     const newColumn: ColumnData = {
-      id: `col-${timestamp}`,
+      id: generateId("col"),
       name: "New Column",
       cards: [],
     };
@@ -174,6 +204,59 @@ export default function HomePage() {
     setAppData(newData);
     handleSave(newData);
     setColumnToDelete(null);
+  };
+
+  const handleCardClick = (card: CardData) => {
+    setSelectedCard(card);
+  };
+
+  const handleCardSave = (updatedCard: CardData) => {
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? {
+              ...b,
+              columns: b.columns.map((col) => ({
+                ...col,
+                cards: col.cards.map((card) =>
+                  card.id === updatedCard.id ? updatedCard : card
+                ),
+              })),
+            }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+  };
+
+  const handleAddCard = (columnId: string) => {
+    const newCard: CardData = {
+      id: generateId("card"),
+      title: "New Card",
+      description: "",
+      priority: "medium",
+    };
+
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? {
+              ...b,
+              columns: b.columns.map((col) =>
+                col.id === columnId
+                  ? { ...col, cards: [...col.cards, newCard] }
+                  : col
+              ),
+            }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+    setSelectedCard(newCard);
   };
 
   const findColumnContainingCard = (cardId: string): ColumnData | undefined => {
@@ -332,14 +415,6 @@ export default function HomePage() {
     }
   };
 
-  if (!isLoaded) {
-    return (
-      <div className="flex min-h-screen bg-background items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
   if (!selectedBoard) return null;
 
   return (
@@ -366,18 +441,24 @@ export default function HomePage() {
             <div className="flex gap-3 w-max">
               <DeleteZone isVisible={isDraggingColumn} />
               {selectedBoard.columns.map((column) => (
-                <SortableColumn key={column.id} column={column} onNameChange={handleColumnNameChange} />
+                <SortableColumn
+                  key={column.id}
+                  column={column}
+                  onNameChange={handleColumnNameChange}
+                  onCardClick={handleCardClick}
+                  onAddCard={handleAddCard}
+                />
               ))}
               <GhostColumn onAddColumn={handleAddColumn} />
             </div>
           </SortableContext>
           <DragOverlay>
             {activeCard ? (
-              <Card title={activeCard.title} className="rotate-3 shadow-lg" />
+              <Card title={activeCard.title} priority={activeCard.priority} hasDescription={!!activeCard.description} className="rotate-3 shadow-lg" />
             ) : activeColumn ? (
               <Column title={activeColumn.name} count={activeColumn.cards.length} className="rotate-2 shadow-xl">
                 {activeColumn.cards.map((card) => (
-                  <Card key={card.id} title={card.title} />
+                  <Card key={card.id} title={card.title} priority={card.priority} hasDescription={!!card.description} />
                 ))}
               </Column>
             ) : null}
@@ -395,6 +476,13 @@ export default function HomePage() {
             : "This will permanently delete this empty column."
         }
         onConfirm={() => columnToDelete && handleDeleteColumn(columnToDelete.id)}
+      />
+
+      <CardModal
+        card={selectedCard}
+        open={selectedCard !== null}
+        onOpenChange={(open) => !open && setSelectedCard(null)}
+        onSave={handleCardSave}
       />
     </div>
   );

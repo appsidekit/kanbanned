@@ -5,14 +5,16 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { Column } from "./Column";
 import { SortableCard } from "./SortableCard";
-import { ColumnData } from "@/lib/types";
+import { CardData, ColumnData } from "@/lib/types";
 
 interface SortableColumnProps {
   column: ColumnData;
   onNameChange?: (columnId: string, name: string) => void;
+  onCardClick?: (card: CardData) => void;
+  onAddCard?: (columnId: string) => void;
 }
 
-export function SortableColumn({ column, onNameChange }: SortableColumnProps) {
+export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
   const {
     attributes,
     listeners,
@@ -41,13 +43,14 @@ export function SortableColumn({ column, onNameChange }: SortableColumnProps) {
         dragHandleProps={{ ...attributes, ...listeners }}
         droppableRef={setDroppableRef}
         onNameChange={onNameChange ? (name) => onNameChange(column.id, name) : undefined}
+        onAddCard={onAddCard ? () => onAddCard(column.id) : undefined}
       >
         <SortableContext
           items={column.cards.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
         >
           {column.cards.map((card) => (
-            <SortableCard key={card.id} card={card} />
+            <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
           ))}
         </SortableContext>
       </Column>

@@ -1,11 +1,21 @@
 import { cn } from "@/lib/utils";
+import { Priority } from "@/lib/types";
+import { AlignLeft } from "lucide-react";
 
 interface CardProps {
   title: string;
+  priority?: Priority;
+  hasDescription?: boolean;
   className?: string;
 }
 
-export function Card({ title, className }: CardProps) {
+const priorityColors: Record<Priority, string> = {
+  low: "bg-blue-500",
+  medium: "bg-yellow-500",
+  high: "bg-red-500",
+};
+
+export function Card({ title, priority, hasDescription, className }: CardProps) {
   return (
     <div
       className={cn(
@@ -16,7 +26,17 @@ export function Card({ title, className }: CardProps) {
         className
       )}
     >
-      <p className="text-sm text-foreground">{title}</p>
+      <div className="flex items-start gap-2">
+        <p className="text-sm text-foreground flex-1">{title}</p>
+        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {hasDescription && (
+            <AlignLeft className="w-3 h-3 text-muted-foreground" />
+          )}
+          {priority && (
+            <span className={cn("w-2 h-2 rounded-full", priorityColors[priority])} />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

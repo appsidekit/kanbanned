@@ -20,7 +20,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange, onBoardNameChange }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);

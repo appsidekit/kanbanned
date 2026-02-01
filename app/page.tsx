@@ -285,6 +285,25 @@ export default function HomePage() {
     return newTag;
   };
 
+  const handleUpdateTag = (tagId: string, updates: Partial<Tag>) => {
+    if (!appData) return;
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? {
+              ...b,
+              tags: b.tags.map((tag) =>
+                tag.id === tagId ? { ...tag, ...updates } : tag
+              ),
+            }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+  };
+
   const handleAddCard = (columnId: string, input: string) => {
     if (!appData) return;
 
@@ -640,6 +659,7 @@ export default function HomePage() {
         onSave={handleCardSave}
         onDelete={handleCardDelete}
         onCreateTag={handleCreateTag}
+        onUpdateTag={handleUpdateTag}
       />
     </div>
   );

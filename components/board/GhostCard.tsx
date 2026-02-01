@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, ghostStyles } from "@/lib/utils";
 
 interface GhostCardProps {
   visible: boolean;
@@ -72,7 +72,7 @@ export function GhostCard({ visible, onAddCard }: GhostCardProps) {
       onClick={handleClick}
       className={cn(
         "rounded-md cursor-pointer px-3 py-2.5",
-        "border-2 border-dashed border-gray-600",
+        `border-2 border-dashed ${ghostStyles.border}`,
         "flex items-center justify-center",
         "transition-opacity duration-200 ease-out",
         visible
@@ -80,7 +80,7 @@ export function GhostCard({ visible, onAddCard }: GhostCardProps) {
           : "opacity-0 pointer-events-none"
       )}
     >
-      <Plus size={14} className="text-gray-600" />
+      <Plus size={14} className={ghostStyles.text} />
     </div>
   );
 }

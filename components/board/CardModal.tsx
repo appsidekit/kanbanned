@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Trash2, Plus, X, ChevronDown } from "lucide-react";
-import { CardData, Priority, Tag } from "@/lib/types";
+import { CardData, Priority, Tag, TAG_COLORS } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CardModalProps {
@@ -14,6 +14,7 @@ interface CardModalProps {
   onSave: (card: CardData) => void;
   onDelete?: (cardId: string) => void;
   onCreateTag?: (name: string) => Tag;
+  onUpdateTag?: (tagId: string, updates: Partial<Tag>) => void;
 }
 
 const priorities: Priority[] = ["low", "medium", "high"];
@@ -24,7 +25,7 @@ const priorityColors: Record<Priority, string> = {
   high: "bg-red-500",
 };
 
-export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, onCreateTag }: CardModalProps) {
+export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, onCreateTag, onUpdateTag }: CardModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -32,6 +33,7 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const [editingColorTagId, setEditingColorTagId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setTagDropdownOpen(false);
+        setEditingColorTagId(null);
       }
     };
     if (tagDropdownOpen) {
@@ -55,29 +58,20 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [tagDropdownOpen]);
 
-  const hasChanges = card && (
-    title !== card.title ||
-    description !== card.description ||
-    priority !== card.priority ||
-    tagId !== card.tagId
-  );
-
-  const handleSave = () => {
-    if (!card) return;
-    onSave({
-      ...card,
-      title: title.trim() || "Untitled",
-      description,
-      priority,
-      tagId,
-    });
-    onOpenChange(false);
-  };
-
-  const handleDiscard = () => {
+  const handleClose = () => {
+    if (card) {
+      onSave({
+        ...card,
+        title: title.trim() || "Untitled",
+        description,
+        priority,
+        tagId,
+      });
+    }
     setIsCreatingTag(false);
     setNewTagName("");
     setTagDropdownOpen(false);
+    setEditingColorTagId(null);
     onOpenChange(false);
   };
 
@@ -92,7 +86,7 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
   const currentTag = tags.find((t) => t.id === tagId);
 
   return (
-    <Dialog.Root open={open} onOpenChange={(open) => !open && handleDiscard()}>
+    <Dialog.Root open={open} onOpenChange={(open) => !open && handleClose()}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 z-50" />
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg rounded-lg bg-background border border-gray-600 shadow-lg overflow-hidden">
@@ -103,24 +97,12 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && hasChanges) {
-                  e.preventDefault();
-                  handleSave();
-                }
-              }}
               className="w-full bg-transparent text-2xl font-semibold text-foreground focus:outline-none placeholder:text-muted-foreground"
               placeholder="Untitled"
             />
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && hasChanges) {
-                  e.preventDefault();
-                  handleSave();
-                }
-              }}
               rows={6}
               className="w-full bg-transparent text-sm text-foreground focus:outline-none resize-none placeholder:text-muted-foreground"
               placeholder="Add notes..."
@@ -205,7 +187,7 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
                   </button>
 
                   {tagDropdownOpen && (
-                    <div className="absolute bottom-full left-0 mb-1 w-40 py-1 bg-card border border-white/10 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                    <div className="absolute bottom-full left-0 mb-1 w-56 py-1 bg-card border border-white/10 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
                       <button
                         onClick={() => {
                           setTagId(undefined);
@@ -220,23 +202,59 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
                         <span className="text-muted-foreground">None</span>
                       </button>
                       {tags.map((tag) => (
-                        <button
-                          key={tag.id}
-                          onClick={() => {
-                            setTagId(tag.id);
-                            setTagDropdownOpen(false);
-                          }}
-                          className={cn(
-                            "w-full px-3 py-1.5 text-xs text-left hover:bg-white/5 flex items-center gap-2",
-                            tagId === tag.id && "bg-white/5"
+                        <div key={tag.id} className="relative">
+                          {editingColorTagId === tag.id ? (
+                            <div className="px-3 py-1.5 flex gap-1">
+                              {TAG_COLORS.map((color) => (
+                                <button
+                                  key={color}
+                                  onClick={() => {
+                                    onUpdateTag?.(tag.id, { color });
+                                    setEditingColorTagId(null);
+                                  }}
+                                  className={cn(
+                                    "w-4 h-4 rounded-full transition-all",
+                                    "hover:scale-110 hover:ring-2 hover:ring-white/40",
+                                    tag.color === color && "ring-2 ring-white"
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                              <button
+                                onClick={() => setEditingColorTagId(null)}
+                                className="ml-auto p-0.5 rounded hover:bg-white/10 text-muted-foreground"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setTagId(tag.id);
+                                setTagDropdownOpen(false);
+                              }}
+                              className={cn(
+                                "w-full px-3 py-1.5 text-xs text-left hover:bg-white/5 flex items-center gap-2",
+                                tagId === tag.id && "bg-white/5"
+                              )}
+                            >
+                              <span
+                                onClick={(e) => {
+                                  if (onUpdateTag) {
+                                    e.stopPropagation();
+                                    setEditingColorTagId(tag.id);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-3 h-3 rounded-full flex-shrink-0",
+                                  onUpdateTag && "hover:ring-2 hover:ring-white/40 cursor-pointer"
+                                )}
+                                style={{ backgroundColor: tag.color }}
+                              />
+                              <span style={{ color: tag.color }}>{tag.name}</span>
+                            </button>
                           )}
-                        >
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: tag.color }}
-                          />
-                          <span style={{ color: tag.color }}>{tag.name}</span>
-                        </button>
+                        </div>
                       ))}
                       {onCreateTag && (
                         <button
@@ -256,9 +274,9 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
               )}
             </div>
 
-            <div className="flex-1" />
-            <div className="flex items-center gap-2">
-              {onDelete && (
+            {onDelete && (
+              <>
+                <div className="flex-1" />
                 <button
                   onClick={() => {
                     onDelete(card!.id);
@@ -268,20 +286,8 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-              )}
-              <button
-                onClick={handleSave}
-                disabled={!hasChanges}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                  hasChanges
-                    ? "bg-white text-black hover:bg-white/90"
-                    : "bg-white/20 text-white/40 cursor-not-allowed"
-                )}
-              >
-                Save
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

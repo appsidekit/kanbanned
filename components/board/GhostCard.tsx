@@ -24,19 +24,24 @@ export function GhostCard({ visible, onAddCard }: GhostCardProps) {
     setIsEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSave = (keepOpen: boolean = false) => {
     const trimmed = title.trim();
     if (trimmed) {
       onAddCard(trimmed);
+      setTitle("");
+      if (!keepOpen) {
+        setIsEditing(false);
+      }
+    } else {
+      setTitle("");
+      setIsEditing(false);
     }
-    setTitle("");
-    setIsEditing(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      handleSave();
+      handleSave(true);
     } else if (e.key === "Escape") {
       setTitle("");
       setIsEditing(false);
@@ -52,7 +57,7 @@ export function GhostCard({ visible, onAddCard }: GhostCardProps) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={handleSave}
+          onBlur={() => handleSave()}
           placeholder="Card title..."
           className="w-full text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground"
         />

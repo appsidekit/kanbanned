@@ -1,4 +1,4 @@
-import { AppData, BoardData, ColumnData, CardData, Priority } from "./types";
+import { AppData, BoardData, ColumnData, CardData, Priority, Tag } from "./types";
 
 const STORAGE_KEY = "kanbanned-data";
 
@@ -45,6 +45,7 @@ const cardSchema: Schema = {
   title: { check: isString, fallback: "Untitled" },
   description: { check: isString, fallback: "" },
   priority: { check: isValidPriority, fallback: "medium" as Priority },
+  tagId: { check: isOptionalString, fallback: undefined },
 };
 
 const columnSchema: Schema = {
@@ -143,7 +144,20 @@ function sanitizeAppData(raw: unknown): LoadResult {
       if (col.recovered) recovered.columns++;
     }
 
-    const board = normalize<BoardData>(rawBoard, boardSchema, { columns: validColumns });
+    // Validate tags array
+    const rawTags = getArray(rawBoard, "tags");
+    const validTags: Tag[] = [];
+    for (const rawTag of rawTags ?? []) {
+      if (
+        hasId(rawTag) &&
+        typeof (rawTag as Record<string, unknown>).name === "string" &&
+        typeof (rawTag as Record<string, unknown>).color === "string"
+      ) {
+        validTags.push(rawTag as Tag);
+      }
+    }
+
+    const board = normalize<BoardData>(rawBoard, boardSchema, { columns: validColumns, tags: validTags });
     validBoards.push(board.result);
     if (board.recovered) recovered.boards++;
   }
@@ -164,28 +178,34 @@ export const defaultBoard: BoardData = {
   id: "default-board",
   name: "kanbanned.com",
   emoji: "🦀",
+  tags: [
+    { id: "tag-bug", name: "bug", color: "#ef4444" },
+    { id: "tag-chore", name: "chore", color: "#8b5cf6" },
+  ],
   columns: [
     {
       id: "col-todo",
       name: "To Do",
       cards: [
         {
+          id: "card-3",
+          title: "Read the documentation",
+          description: "Just kidding, Stack Overflow it is",
+          priority: "low",
+        },
+        {
           id: "card-1",
           title: "Fix bug that only happens on Fridays",
           description: "It works on my machine, I swear",
           priority: "high",
+          tagId: "tag-bug",
         },
         {
           id: "card-2",
           title: "Delete node_modules and pray",
           description: "The ancient ritual of JavaScript developers",
           priority: "medium",
-        },
-        {
-          id: "card-3",
-          title: "Read the documentation",
-          description: "Just kidding, Stack Overflow it is",
-          priority: "low",
+          tagId: "tag-chore",
         },
       ],
     },
@@ -204,6 +224,7 @@ export const defaultBoard: BoardData = {
           title: "Googling how to exit Vim",
           description: "Day 47: Still trapped. Send help.",
           priority: "high",
+          tagId: "tag-bug",
         },
       ],
     },

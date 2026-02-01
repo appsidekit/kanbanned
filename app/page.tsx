@@ -26,7 +26,7 @@ import { DeleteZone } from "@/components/board/DeleteZone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CardModal } from "@/components/board/CardModal";
 import { loadAppData, saveAppDataDebounced, flushPendingSave, generateId, defaultBoard, LoadResult } from "@/lib/storage";
-import { AppData, CardData, ColumnData } from "@/lib/types";
+import { AppData, CardData, ColumnData, Tag } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
@@ -265,6 +265,33 @@ export default function HomePage() {
     handleSave(newData);
   };
 
+  const tagColors = [
+    "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
+    "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280",
+  ];
+
+  const handleCreateTag = (name: string): Tag => {
+    const newTag: Tag = {
+      id: generateId("tag"),
+      name,
+      color: tagColors[(selectedBoard?.tags.length ?? 0) % tagColors.length],
+    };
+
+    if (!appData) return newTag;
+
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? { ...b, tags: [...b.tags, newTag] }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+    return newTag;
+  };
+
   const handleAddCard = (columnId: string, title: string) => {
     if (!appData) return;
     const newCard: CardData = {
@@ -336,6 +363,12 @@ export default function HomePage() {
       if (column) {
         setColumnToDelete(column);
       }
+      return;
+    }
+
+    // Handle card deletion
+    if (!isColumnId(activeId) && overId === "delete-zone") {
+      handleCardDelete(activeId);
       return;
     }
 
@@ -474,11 +507,12 @@ export default function HomePage() {
             strategy={horizontalListSortingStrategy}
           >
             <div className="flex flex-col gap-4 md:flex-row md:gap-3 md:w-max">
-              <DeleteZone isVisible={isDraggingColumn} />
+              <DeleteZone isVisible={isDraggingColumn || activeCard !== null} />
               {selectedBoard.columns.map((column) => (
                 <SortableColumn
                   key={column.id}
                   column={column}
+                  tags={selectedBoard.tags}
                   onNameChange={handleColumnNameChange}
                   onCardClick={handleCardClick}
                   onAddCard={handleAddCard}
@@ -515,10 +549,12 @@ export default function HomePage() {
 
       <CardModal
         card={selectedCard}
+        tags={selectedBoard.tags}
         open={selectedCard !== null}
         onOpenChange={(open) => !open && setSelectedCard(null)}
         onSave={handleCardSave}
         onDelete={handleCardDelete}
+        onCreateTag={handleCreateTag}
       />
     </div>
   );

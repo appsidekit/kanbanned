@@ -6,6 +6,7 @@ export const appData: AppData = {
     {
       id: "board-1",
       name: "kanbanned",
+      tags: [],
       columns: [
         {
           id: "col-1",
@@ -84,6 +85,7 @@ export const appData: AppData = {
     {
       id: "board-2",
       name: "Personal",
+      tags: [],
       columns: [
         {
           id: "col-5",

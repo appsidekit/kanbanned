@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Trash2 } from "lucide-react";
-import { CardData, Priority } from "@/lib/types";
+import { Trash2, Plus, X, ChevronDown } from "lucide-react";
+import { CardData, Priority, Tag } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface CardModalProps {
   card: CardData | null;
+  tags: Tag[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (card: CardData) => void;
   onDelete?: (cardId: string) => void;
+  onCreateTag?: (name: string) => Tag;
 }
 
 const priorities: Priority[] = ["low", "medium", "high"];
@@ -22,23 +24,47 @@ const priorityColors: Record<Priority, string> = {
   high: "bg-red-500",
 };
 
-export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardModalProps) {
+const tagColors = [
+  "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280",
+];
+
+export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, onCreateTag }: CardModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
+  const [tagId, setTagId] = useState<string | undefined>(undefined);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (card) {
       setTitle(card.title);
       setDescription(card.description);
       setPriority(card.priority);
+      setTagId(card.tagId);
     }
   }, [card]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+      }
+    };
+    if (tagDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [tagDropdownOpen]);
 
   const hasChanges = card && (
     title !== card.title ||
     description !== card.description ||
-    priority !== card.priority
+    priority !== card.priority ||
+    tagId !== card.tagId
   );
 
   const handleSave = () => {
@@ -48,13 +74,27 @@ export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardMo
       title: title.trim() || "Untitled",
       description,
       priority,
+      tagId,
     });
     onOpenChange(false);
   };
 
   const handleDiscard = () => {
+    setIsCreatingTag(false);
+    setNewTagName("");
+    setTagDropdownOpen(false);
     onOpenChange(false);
   };
+
+  const handleCreateTag = () => {
+    if (!newTagName.trim() || !onCreateTag) return;
+    const newTag = onCreateTag(newTagName.trim());
+    setTagId(newTag.id);
+    setNewTagName("");
+    setIsCreatingTag(false);
+  };
+
+  const currentTag = tags.find((t) => t.id === tagId);
 
   return (
     <Dialog.Root open={open} onOpenChange={(open) => !open && handleDiscard()}>
@@ -80,7 +120,7 @@ export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardMo
             />
           </div>
 
-          <div className="flex items-center justify-between px-3 py-3 border-t border-white/[0.06]">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-3 py-3 border-t border-white/[0.06]">
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground">Priority</span>
               <div className="flex items-center gap-2">
@@ -97,6 +137,118 @@ export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardMo
                 ))}
               </div>
             </div>
+
+            <div className="flex items-center gap-3 relative" ref={dropdownRef}>
+              <span className="text-xs text-muted-foreground">Tag</span>
+              {isCreatingTag ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={newTagName}
+                    onChange={(e) => setNewTagName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCreateTag();
+                      if (e.key === "Escape") {
+                        setIsCreatingTag(false);
+                        setNewTagName("");
+                      }
+                    }}
+                    placeholder="Tag name..."
+                    className="w-24 px-2 py-0.5 text-xs bg-white/10 rounded border border-white/20 focus:outline-none focus:border-white/40"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleCreateTag}
+                    className="p-0.5 rounded hover:bg-white/10"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsCreatingTag(false);
+                      setNewTagName("");
+                    }}
+                    className="p-0.5 rounded hover:bg-white/10"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setTagDropdownOpen(!tagDropdownOpen)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-md",
+                      "border border-white/10 hover:border-white/20 transition-colors"
+                    )}
+                  >
+                    {currentTag ? (
+                      <>
+                        <span
+                          className="w-2 h-2 rounded-full"
+                          style={{ backgroundColor: currentTag.color }}
+                        />
+                        <span style={{ color: currentTag.color }}>{currentTag.name}</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  </button>
+
+                  {tagDropdownOpen && (
+                    <div className="absolute bottom-full left-0 mb-1 w-40 py-1 bg-card border border-white/10 rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                      <button
+                        onClick={() => {
+                          setTagId(undefined);
+                          setTagDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full px-3 py-1.5 text-xs text-left hover:bg-white/5 flex items-center gap-2",
+                          !tagId && "bg-white/5"
+                        )}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-gray-500" />
+                        <span className="text-muted-foreground">None</span>
+                      </button>
+                      {tags.map((tag) => (
+                        <button
+                          key={tag.id}
+                          onClick={() => {
+                            setTagId(tag.id);
+                            setTagDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "w-full px-3 py-1.5 text-xs text-left hover:bg-white/5 flex items-center gap-2",
+                            tagId === tag.id && "bg-white/5"
+                          )}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: tag.color }}
+                          />
+                          <span style={{ color: tag.color }}>{tag.name}</span>
+                        </button>
+                      ))}
+                      {onCreateTag && (
+                        <button
+                          onClick={() => {
+                            setIsCreatingTag(true);
+                            setTagDropdownOpen(false);
+                          }}
+                          className="w-full px-3 py-1.5 text-xs text-left hover:bg-white/5 flex items-center gap-2 border-t border-white/5 mt-1 pt-1.5"
+                        >
+                          <Plus className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-muted-foreground">New tag</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <div className="flex-1" />
             <div className="flex items-center gap-2">
               {onDelete && (
                 <button

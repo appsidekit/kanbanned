@@ -5,16 +5,17 @@ import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import { Column } from "./Column";
 import { SortableCard } from "./SortableCard";
-import { CardData, ColumnData } from "@/lib/types";
+import { CardData, ColumnData, Tag } from "@/lib/types";
 
 interface SortableColumnProps {
   column: ColumnData;
+  tags: Tag[];
   onNameChange?: (columnId: string, name: string) => void;
   onCardClick?: (card: CardData) => void;
   onAddCard?: (columnId: string, title: string) => void;
 }
 
-export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
+export function SortableColumn({ column, tags, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
   const {
     attributes,
     listeners,
@@ -35,6 +36,23 @@ export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }:
     opacity: isDragging ? 0 : 1,
   };
 
+  // Group cards: untagged first, then by tag (sorted alphabetically)
+  const untaggedCards = column.cards.filter((c) => !c.tagId);
+
+  // Get unique tag IDs present in this column
+  const tagIdsInColumn = [...new Set(column.cards.map((c) => c.tagId).filter(Boolean))] as string[];
+
+  // Get tags that are in this column, sorted alphabetically by name
+  const tagsInColumn = tags
+    .filter((t) => tagIdsInColumn.includes(t.id))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Build sorted card list for SortableContext
+  const sortedCards = [
+    ...untaggedCards,
+    ...tagsInColumn.flatMap((tag) => column.cards.filter((c) => c.tagId === tag.id)),
+  ];
+
   return (
     <div ref={setSortableRef} style={style}>
       <Column
@@ -46,12 +64,33 @@ export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }:
         onAddCard={onAddCard ? (title) => onAddCard(column.id, title) : undefined}
       >
         <SortableContext
-          items={column.cards.map((c) => c.id)}
+          items={sortedCards.map((c) => c.id)}
           strategy={verticalListSortingStrategy}
         >
-          {column.cards.map((card) => (
+          {/* Untagged cards - no header */}
+          {untaggedCards.map((card) => (
             <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
           ))}
+
+          {/* Tagged groups with headers */}
+          {tagsInColumn.map((tag) => {
+            const tagCards = column.cards.filter((c) => c.tagId === tag.id);
+            return (
+              <div key={tag.id} className="mt-2">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-xs text-muted-foreground">
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: tag.color }}
+                  />
+                  <span>{tag.name}</span>
+                  <span className="opacity-50">({tagCards.length})</span>
+                </div>
+                {tagCards.map((card) => (
+                  <SortableCard key={card.id} card={card} onCardClick={onCardClick} />
+                ))}
+              </div>
+            );
+          })}
         </SortableContext>
       </Column>
     </div>

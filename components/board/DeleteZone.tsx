@@ -20,11 +20,12 @@ export function DeleteZone({ isVisible }: DeleteZoneProps) {
       ref={setNodeRef}
       className={cn(
         "flex-shrink-0 flex items-center justify-center",
-        "min-h-[calc(100vh-3rem)] rounded-md",
-        "border-2 border-dashed transition-all duration-200",
+        "rounded-md border-2 border-dashed transition-all duration-200",
+        // Mobile: horizontal bar
+        "w-full h-16 md:h-auto md:min-h-[calc(100vh-3rem)]",
         isOver
-          ? "w-72 border-red-500 bg-red-500/10"
-          : "w-12 border-red-400/50 bg-red-500/5"
+          ? "md:w-72 border-red-500 bg-red-500/10"
+          : "md:w-12 border-red-400/50 bg-red-500/5"
       )}
     >
       <div

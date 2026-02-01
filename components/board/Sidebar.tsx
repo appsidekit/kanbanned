@@ -74,32 +74,40 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
     <aside
       className={cn(
         "shrink-0 transition-all duration-200 ease-in-out",
-        isCollapsed ? "w-16" : "w-56",
-        "h-screen sticky top-0",
-        "flex flex-col",
-        "bg-sidebar border-r border-white/[0.06]"
+        "bg-sidebar",
+        // Mobile: horizontal header
+        "w-full h-14 sticky top-0 z-50",
+        "border-b border-white/[0.06]",
+        // Desktop: vertical sidebar
+        "md:w-56 md:h-screen md:border-b-0 md:border-r",
+        isCollapsed && "md:w-16"
       )}
     >
       <div
         className={cn(
-          "flex flex-col flex-1 py-4 space-y-4",
-          isCollapsed ? "px-2" : "px-3"
+          "flex items-center h-full px-3 gap-4",
+          // Desktop: vertical layout
+          "md:flex-col md:items-stretch md:py-4 md:space-y-4 md:gap-0",
+          isCollapsed && "md:px-2"
         )}
       >
         {/* Board Selector */}
-        <div className={cn(isCollapsed && "flex justify-center", "relative")} ref={dropdownRef}>
-          {isCollapsed ? (
-            <button
-              type="button"
-              onClick={() => setIsCollapsed(false)}
-              className="w-10 h-10 rounded-md bg-card border border-white/[0.06] flex items-center justify-center hover:bg-card/80 transition-colors"
-            >
-              <span className="text-sm">
-                {selectedBoard?.emoji || selectedBoard?.name.charAt(0).toUpperCase()}
-              </span>
-            </button>
-          ) : (
-            <>
+        <div className={cn("relative flex-1 md:flex-none", isCollapsed && "md:flex md:justify-center")} ref={dropdownRef}>
+          {/* Collapsed state - desktop only */}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(false)}
+            className={cn(
+              "w-10 h-10 rounded-md bg-card border border-white/[0.06] items-center justify-center hover:bg-card/80 transition-colors",
+              isCollapsed ? "hidden md:flex" : "hidden"
+            )}
+          >
+            <span className="text-sm">
+              {selectedBoard?.emoji || selectedBoard?.name.charAt(0).toUpperCase()}
+            </span>
+          </button>
+          {/* Expanded state - always on mobile, conditional on desktop */}
+          <div className={cn(isCollapsed ? "contents md:hidden" : "contents")}>
               <div
                 className="w-full h-10 px-2 rounded-md bg-card border border-white/[0.06] flex items-center justify-between hover:bg-card/80 transition-colors cursor-pointer"
                 onClick={() => {
@@ -148,7 +156,7 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
               </div>
 
               {isEmojiPickerOpen && (
-                <div className="absolute top-12 left-0 right-0 z-50 rounded-lg bg-card border border-white/[0.06] shadow-lg p-2">
+                <div className="absolute top-12 left-0 right-0 z-50 rounded-lg bg-card border border-white/[0.06] shadow-lg p-2 md:right-auto md:min-w-[200px]">
                   <div className="grid grid-cols-8 gap-1">
                     {EMOJI_OPTIONS.map((emoji) => (
                       <button
@@ -168,7 +176,7 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
               )}
 
               {isDropdownOpen && (
-                <div className="absolute top-12 left-0 right-0 z-50 rounded-lg bg-card border border-white/[0.06] shadow-lg overflow-hidden">
+                <div className="absolute top-12 left-0 right-0 z-50 rounded-lg bg-card border border-white/[0.06] shadow-lg overflow-hidden md:right-auto md:min-w-[200px]">
                   {boards.map((board) => (
                     <button
                       key={board.id}
@@ -208,12 +216,11 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
                   </div>
                 </div>
               )}
-            </>
-          )}
+            </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 pt-4 border-t border-white/[0.03]">
+        {/* Navigation - hidden on mobile */}
+        <nav className="hidden md:block flex-1 space-y-1 pt-4 border-t border-white/[0.03]">
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -231,9 +238,9 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
           </button>
         </nav>
 
-        {/* Branding */}
+        {/* Branding - hidden on mobile */}
         {!isCollapsed && (
-          <div className="text-center text-sm font-mono select-none text-muted-foreground">
+          <div className="hidden md:block text-center text-sm font-mono select-none text-muted-foreground">
             kanbanned.com
           </div>
         )}

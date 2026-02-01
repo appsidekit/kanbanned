@@ -8,6 +8,7 @@ import {
   DragOverlay,
   pointerWithin,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -61,6 +62,12 @@ export default function HomePage() {
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
       },
     })
   );
@@ -418,7 +425,7 @@ export default function HomePage() {
   if (!selectedBoard) return null;
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex flex-col md:flex-row min-h-screen bg-background">
       <Sidebar
         boards={appData.boards}
         selectedBoardId={selectedBoardId}
@@ -427,7 +434,7 @@ export default function HomePage() {
         onBoardNameChange={handleBoardNameChange}
       />
 
-      <main className="flex-1 p-6 overflow-x-auto">
+      <main className="flex-1 p-4 md:p-6 overflow-x-auto md:overflow-x-auto overflow-y-auto">
         <DndContext
           sensors={sensors}
           collisionDetection={pointerWithin}
@@ -438,7 +445,7 @@ export default function HomePage() {
             items={selectedBoard.columns.map((c) => c.id)}
             strategy={horizontalListSortingStrategy}
           >
-            <div className="flex gap-3 w-max">
+            <div className="flex flex-col gap-4 md:flex-row md:gap-3 md:w-max">
               <DeleteZone isVisible={isDraggingColumn} />
               {selectedBoard.columns.map((column) => (
                 <SortableColumn

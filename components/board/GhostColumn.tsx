@@ -13,20 +13,20 @@ export function GhostColumn({ onAddColumn }: GhostColumnProps) {
 
   return (
     <div
-      className="flex-shrink-0 w-72 min-h-[calc(100vh-3rem)]"
+      className="flex-shrink-0 w-full md:w-72 min-h-[120px] md:min-h-[calc(100vh-3rem)]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
         onClick={onAddColumn}
         className={cn(
-          "w-72 min-h-[calc(100vh-3rem)] rounded-md cursor-pointer",
+          "w-full md:w-72 min-h-[120px] md:min-h-[calc(100vh-3rem)] rounded-md cursor-pointer",
           "border-2 border-dashed border-gray-500",
           "flex items-center justify-center",
           "transition-opacity duration-200 ease-out",
-          isHovered
-            ? "opacity-100 bg-muted/30 border-gray-400"
-            : "opacity-0"
+          // Always visible on mobile, hover-dependent on desktop
+          "opacity-100 md:opacity-0",
+          isHovered && "md:opacity-100 bg-muted/30 border-gray-400"
         )}
       >
         <div className="flex flex-col items-center gap-2 text-muted-foreground/60">

@@ -52,8 +52,11 @@ export function Column({ title, count = 0, children, className, dragHandleProps,
   return (
     <div
       className={cn(
-        "flex flex-col w-72 bg-column rounded-md",
-        "min-h-[calc(100vh-3rem)]",
+        "flex flex-col bg-column rounded-md",
+        // Mobile: full width, compact height
+        "w-full min-h-[200px] max-h-[400px]",
+        // Desktop: fixed width, full height
+        "md:w-72 md:min-h-[calc(100vh-3rem)] md:max-h-none",
         className
       )}
       onMouseEnter={() => setIsHovered(true)}

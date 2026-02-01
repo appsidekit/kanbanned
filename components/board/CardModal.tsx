@@ -24,11 +24,6 @@ const priorityColors: Record<Priority, string> = {
   high: "bg-red-500",
 };
 
-const tagColors = [
-  "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
-  "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280",
-];
-
 export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, onCreateTag }: CardModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -154,6 +149,7 @@ export function CardModal({ card, tags, open, onOpenChange, onSave, onDelete, on
                       }
                     }}
                     placeholder="Tag name..."
+                    maxLength={14}
                     className="w-24 px-2 py-0.5 text-xs bg-white/10 rounded border border-white/20 focus:outline-none focus:border-white/40"
                     autoFocus
                   />

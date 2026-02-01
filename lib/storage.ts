@@ -147,13 +147,29 @@ function sanitizeAppData(raw: unknown): LoadResult {
     // Validate tags array
     const rawTags = getArray(rawBoard, "tags");
     const validTags: Tag[] = [];
+    const hexColorRegex = /^#[0-9A-Fa-f]{6}$/;
     for (const rawTag of rawTags ?? []) {
       if (
         hasId(rawTag) &&
         typeof (rawTag as Record<string, unknown>).name === "string" &&
         typeof (rawTag as Record<string, unknown>).color === "string"
       ) {
-        validTags.push(rawTag as Tag);
+        const color = (rawTag as Record<string, unknown>).color as string;
+        validTags.push({
+          ...(rawTag as Tag),
+          color: hexColorRegex.test(color) ? color : "#000000",
+        });
+      }
+    }
+
+    // Remove orphaned tag references from cards
+    const validTagIds = new Set(validTags.map((t) => t.id));
+    for (const column of validColumns) {
+      for (const card of column.cards) {
+        if (card.tagId && !validTagIds.has(card.tagId)) {
+          card.tagId = undefined;
+          recovered.cards++;
+        }
       }
     }
 

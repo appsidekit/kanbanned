@@ -26,7 +26,7 @@ import { DeleteZone } from "@/components/board/DeleteZone";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CardModal } from "@/components/board/CardModal";
 import { loadAppData, saveAppDataDebounced, flushPendingSave, generateId, defaultBoard, LoadResult } from "@/lib/storage";
-import { AppData, CardData, ColumnData, Tag } from "@/lib/types";
+import { AppData, CardData, ColumnData, Tag, TAG_COLORS } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
@@ -265,16 +265,17 @@ export default function HomePage() {
     handleSave(newData);
   };
 
-  const tagColors = [
-    "#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6",
-    "#3b82f6", "#8b5cf6", "#ec4899", "#6b7280",
-  ];
-
   const handleCreateTag = (name: string): Tag => {
+    // Return existing tag if name already exists
+    const existingTag = selectedBoard?.tags.find(
+      (t) => t.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existingTag) return existingTag;
+
     const newTag: Tag = {
       id: generateId("tag"),
       name,
-      color: tagColors[(selectedBoard?.tags.length ?? 0) % tagColors.length],
+      color: TAG_COLORS[(selectedBoard?.tags.length ?? 0) % TAG_COLORS.length],
     };
 
     if (!appData) return newTag;

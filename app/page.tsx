@@ -265,13 +265,13 @@ export default function HomePage() {
     handleSave(newData);
   };
 
-  const handleAddCard = (columnId: string) => {
+  const handleAddCard = (columnId: string, title: string) => {
     if (!appData) return;
     const newCard: CardData = {
       id: generateId("card"),
-      title: "New Card",
+      title,
       description: "",
-      priority: "medium",
+      priority: "low",
     };
 
     const newData = {
@@ -291,7 +291,6 @@ export default function HomePage() {
     };
     setAppData(newData);
     handleSave(newData);
-    setSelectedCard(newCard);
   };
 
   const findColumnContainingCard = (cardId: string): ColumnData | undefined => {

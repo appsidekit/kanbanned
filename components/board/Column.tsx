@@ -13,7 +13,7 @@ interface ColumnProps {
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   droppableRef?: (node: HTMLElement | null) => void;
   onNameChange?: (name: string) => void;
-  onAddCard?: () => void;
+  onAddCard?: (title: string) => void;
 }
 
 export function Column({ title, count = 0, children, className, dragHandleProps, droppableRef, onNameChange, onAddCard }: ColumnProps) {

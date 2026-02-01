@@ -11,7 +11,7 @@ interface SortableColumnProps {
   column: ColumnData;
   onNameChange?: (columnId: string, name: string) => void;
   onCardClick?: (card: CardData) => void;
-  onAddCard?: (columnId: string) => void;
+  onAddCard?: (columnId: string, title: string) => void;
 }
 
 export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }: SortableColumnProps) {
@@ -43,7 +43,7 @@ export function SortableColumn({ column, onNameChange, onCardClick, onAddCard }:
         dragHandleProps={{ ...attributes, ...listeners }}
         droppableRef={setDroppableRef}
         onNameChange={onNameChange ? (name) => onNameChange(column.id, name) : undefined}
-        onAddCard={onAddCard ? () => onAddCard(column.id) : undefined}
+        onAddCard={onAddCard ? (title) => onAddCard(column.id, title) : undefined}
       >
         <SortableContext
           items={column.cards.map((c) => c.id)}

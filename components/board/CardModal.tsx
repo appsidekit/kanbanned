@@ -80,8 +80,24 @@ export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardMo
             />
           </div>
 
-          <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06]">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between px-3 py-3 border-t border-white/[0.06]">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">Priority</span>
+              <div className="flex items-center gap-2">
+                {priorities.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPriority(p)}
+                    className={cn(
+                      "w-3 h-3 rounded-full transition-all",
+                      priorityColors[p],
+                      priority === p ? "ring-2 ring-white ring-offset-2 ring-offset-background" : "opacity-40 hover:opacity-70"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               {onDelete && (
                 <button
                   onClick={() => {
@@ -93,31 +109,19 @@ export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardMo
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground">Priority</span>
-                <div className="flex items-center gap-2">
-                  {priorities.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setPriority(p)}
-                      className={cn(
-                        "w-3 h-3 rounded-full transition-all",
-                        priorityColors[p],
-                        priority === p ? "ring-2 ring-white ring-offset-2 ring-offset-background" : "opacity-40 hover:opacity-70"
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-            {hasChanges && (
               <button
                 onClick={handleSave}
-                className="px-3 py-1.5 text-sm font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors"
+                disabled={!hasChanges}
+                className={cn(
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  hasChanges
+                    ? "bg-white text-black hover:bg-white/90"
+                    : "bg-white/20 text-white/40 cursor-not-allowed"
+                )}
               >
                 Save
               </button>
-            )}
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

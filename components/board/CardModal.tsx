@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Trash2 } from "lucide-react";
 import { CardData, Priority } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ interface CardModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (card: CardData) => void;
+  onDelete?: (cardId: string) => void;
 }
 
 const priorities: Priority[] = ["low", "medium", "high"];
@@ -20,7 +22,7 @@ const priorityColors: Record<Priority, string> = {
   high: "bg-red-500",
 };
 
-export function CardModal({ card, open, onOpenChange, onSave }: CardModalProps) {
+export function CardModal({ card, open, onOpenChange, onSave, onDelete }: CardModalProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("medium");
@@ -79,20 +81,33 @@ export function CardModal({ card, open, onOpenChange, onSave }: CardModalProps) 
           </div>
 
           <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.06]">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">Priority</span>
-              <div className="flex items-center gap-2">
-                {priorities.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPriority(p)}
-                    className={cn(
-                      "w-3 h-3 rounded-full transition-all",
-                      priorityColors[p],
-                      priority === p ? "ring-2 ring-white ring-offset-2 ring-offset-background" : "opacity-40 hover:opacity-70"
-                    )}
-                  />
-                ))}
+            <div className="flex items-center gap-4">
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    onDelete(card!.id);
+                    onOpenChange(false);
+                  }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">Priority</span>
+                <div className="flex items-center gap-2">
+                  {priorities.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPriority(p)}
+                      className={cn(
+                        "w-3 h-3 rounded-full transition-all",
+                        priorityColors[p],
+                        priority === p ? "ring-2 ring-white ring-offset-2 ring-offset-background" : "opacity-40 hover:opacity-70"
+                      )}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
             {hasChanges && (

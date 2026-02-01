@@ -30,15 +30,10 @@ import { AppData, CardData, ColumnData } from "@/lib/types";
 import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
-  // Load data synchronously on first render - no loading screen needed
+  // Start with null to avoid hydration mismatch - localStorage only available on client
+  const [appData, setAppData] = useState<AppData | null>(null);
+  const [selectedBoardId, setSelectedBoardId] = useState<string>("");
   const loadResultRef = useRef<LoadResult | null>(null);
-  if (loadResultRef.current === null) {
-    loadResultRef.current = loadAppData();
-  }
-  const initialResult = loadResultRef.current;
-
-  const [appData, setAppData] = useState<AppData>(initialResult.data);
-  const [selectedBoardId, setSelectedBoardId] = useState<string>(initialResult.data.boards[0]?.id || "");
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
   const [activeColumn, setActiveColumn] = useState<ColumnData | null>(null);
   const [isDraggingColumn, setIsDraggingColumn] = useState(false);
@@ -72,9 +67,15 @@ export default function HomePage() {
     })
   );
 
+  // Load data from localStorage on mount (client-side only)
   useEffect(() => {
+    const result = loadAppData();
+    loadResultRef.current = result;
+    setAppData(result.data);
+    setSelectedBoardId(result.data.boards[0]?.id || "");
+
     // Notify user if data was recovered or reset
-    const { discarded, recovered, usedDefaults } = initialResult;
+    const { discarded, recovered, usedDefaults } = result;
     const totalDiscarded = discarded.cards + discarded.columns + discarded.boards;
     const totalRecovered = recovered.cards + recovered.columns + recovered.boards;
 
@@ -109,9 +110,10 @@ export default function HomePage() {
     };
   }, []);
 
-  const selectedBoard = appData.boards.find((b) => b.id === selectedBoardId);
+  const selectedBoard = appData?.boards.find((b) => b.id === selectedBoardId);
 
   const handleBoardChange = (boardId: string) => {
+    if (!appData) return;
     if (boardId === "__new__") {
       const newBoard = {
         ...defaultBoard,
@@ -139,6 +141,7 @@ export default function HomePage() {
   };
 
   const handleEmojiChange = (boardId: string, emoji: string) => {
+    if (!appData) return;
     const newData = {
       ...appData,
       boards: appData.boards.map((b) =>
@@ -150,6 +153,7 @@ export default function HomePage() {
   };
 
   const handleBoardNameChange = (boardId: string, name: string) => {
+    if (!appData) return;
     const newData = {
       ...appData,
       boards: appData.boards.map((b) =>
@@ -161,7 +165,7 @@ export default function HomePage() {
   };
 
   const handleAddColumn = () => {
-    if (!selectedBoard) return;
+    if (!appData || !selectedBoard) return;
 
     const newColumn: ColumnData = {
       id: generateId("col"),
@@ -182,6 +186,7 @@ export default function HomePage() {
   };
 
   const handleColumnNameChange = (columnId: string, name: string) => {
+    if (!appData) return;
     const newData = {
       ...appData,
       boards: appData.boards.map((b) =>
@@ -200,6 +205,7 @@ export default function HomePage() {
   };
 
   const handleDeleteColumn = (columnId: string) => {
+    if (!appData) return;
     const newData = {
       ...appData,
       boards: appData.boards.map((b) =>
@@ -218,6 +224,7 @@ export default function HomePage() {
   };
 
   const handleCardSave = (updatedCard: CardData) => {
+    if (!appData) return;
     const newData = {
       ...appData,
       boards: appData.boards.map((b) =>
@@ -238,7 +245,28 @@ export default function HomePage() {
     handleSave(newData);
   };
 
+  const handleCardDelete = (cardId: string) => {
+    if (!appData) return;
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? {
+              ...b,
+              columns: b.columns.map((col) => ({
+                ...col,
+                cards: col.cards.filter((card) => card.id !== cardId),
+              })),
+            }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+  };
+
   const handleAddCard = (columnId: string) => {
+    if (!appData) return;
     const newCard: CardData = {
       id: generateId("card"),
       title: "New Card",
@@ -298,7 +326,7 @@ export default function HomePage() {
     setIsDraggingColumn(false);
     const { active, over } = event;
 
-    if (!over || !selectedBoard) return;
+    if (!appData || !over || !selectedBoard) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -422,7 +450,8 @@ export default function HomePage() {
     }
   };
 
-  if (!selectedBoard) return null;
+  // Wait for client-side data load
+  if (!appData || !selectedBoard) return null;
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-background">
@@ -490,6 +519,7 @@ export default function HomePage() {
         open={selectedCard !== null}
         onOpenChange={(open) => !open && setSelectedCard(null)}
         onSave={handleCardSave}
+        onDelete={handleCardDelete}
       />
     </div>
   );

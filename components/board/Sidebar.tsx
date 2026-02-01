@@ -213,7 +213,7 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1 pt-4 border-t border-white/[0.03]">
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -233,26 +233,8 @@ export function Sidebar({ boards, selectedBoardId, onBoardChange, onEmojiChange,
 
         {/* Branding */}
         {!isCollapsed && (
-          <div className="pt-4 border-t border-white/[0.06]">
-            <div
-              className="text-center text-[10px] tracking-[0.3em] font-mono uppercase select-none"
-              style={{
-                background: "linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3, #ff6b6b)",
-                backgroundSize: "200% auto",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-                animation: "gradient-shift 3s linear infinite",
-              }}
-            >
-              kanbanned.com
-            </div>
-            <style jsx>{`
-              @keyframes gradient-shift {
-                0% { background-position: 0% center; }
-                100% { background-position: 200% center; }
-              }
-            `}</style>
+          <div className="text-center text-sm font-mono select-none text-muted-foreground">
+            kanbanned.com
           </div>
         )}
       </div>

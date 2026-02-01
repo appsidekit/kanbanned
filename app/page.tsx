@@ -18,16 +18,35 @@ import {
 } from "@dnd-kit/sortable";
 import { SortableColumn } from "@/components/board/SortableColumn";
 import { Card } from "@/components/board/Card";
+import { Column } from "@/components/board/Column";
 import { Sidebar } from "@/components/board/Sidebar";
 import { GhostColumn } from "@/components/board/GhostColumn";
+import { DeleteZone } from "@/components/board/DeleteZone";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { loadAppData, saveAppData, defaultAppData, defaultBoard } from "@/lib/storage";
 import { AppData, CardData, ColumnData } from "@/lib/types";
+import { useToast } from "@/components/ui/toast";
 
 export default function HomePage() {
   const [appData, setAppData] = useState<AppData>(defaultAppData);
   const [selectedBoardId, setSelectedBoardId] = useState<string>("");
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
+  const [activeColumn, setActiveColumn] = useState<ColumnData | null>(null);
+  const [isDraggingColumn, setIsDraggingColumn] = useState(false);
+  const [columnToDelete, setColumnToDelete] = useState<ColumnData | null>(null);
+  const { toast } = useToast();
+
+  const handleSave = (data: AppData) => {
+    const result = saveAppData(data);
+    if (!result.success) {
+      if (result.error === "quota_exceeded") {
+        toast("Storage full. Your changes may not be saved. Try deleting some boards or cards.", "error");
+      } else {
+        toast("Failed to save changes. Please try again.", "error");
+      }
+    }
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -38,10 +57,17 @@ export default function HomePage() {
   );
 
   useEffect(() => {
-    const data = loadAppData();
-    setAppData(data);
-    setSelectedBoardId(data.boards[0]?.id || "");
-    setIsLoaded(true);
+    try {
+      const data = loadAppData();
+      setAppData(data);
+      setSelectedBoardId(data.boards[0]?.id || "");
+    } catch (error) {
+      console.error("Failed to load app data:", error);
+      setAppData(defaultAppData);
+      setSelectedBoardId(defaultAppData.boards[0]?.id || "");
+    } finally {
+      setIsLoaded(true);
+    }
   }, []);
 
   const selectedBoard = appData.boards.find((b) => b.id === selectedBoardId);
@@ -67,7 +93,7 @@ export default function HomePage() {
         boards: [...appData.boards, newBoard],
       };
       setAppData(newData);
-      saveAppData(newData);
+      handleSave(newData);
       setSelectedBoardId(newBoard.id);
       return;
     }
@@ -82,7 +108,7 @@ export default function HomePage() {
       ),
     };
     setAppData(newData);
-    saveAppData(newData);
+    handleSave(newData);
   };
 
   const handleBoardNameChange = (boardId: string, name: string) => {
@@ -93,7 +119,7 @@ export default function HomePage() {
       ),
     };
     setAppData(newData);
-    saveAppData(newData);
+    handleSave(newData);
   };
 
   const handleAddColumn = () => {
@@ -115,7 +141,7 @@ export default function HomePage() {
       ),
     };
     setAppData(newData);
-    saveAppData(newData);
+    handleSave(newData);
   };
 
   const handleColumnNameChange = (columnId: string, name: string) => {
@@ -133,7 +159,21 @@ export default function HomePage() {
       ),
     };
     setAppData(newData);
-    saveAppData(newData);
+    handleSave(newData);
+  };
+
+  const handleDeleteColumn = (columnId: string) => {
+    const newData = {
+      ...appData,
+      boards: appData.boards.map((b) =>
+        b.id === selectedBoardId
+          ? { ...b, columns: b.columns.filter((col) => col.id !== columnId) }
+          : b
+      ),
+    };
+    setAppData(newData);
+    handleSave(newData);
+    setColumnToDelete(null);
   };
 
   const findColumnContainingCard = (cardId: string): ColumnData | undefined => {
@@ -150,8 +190,12 @@ export default function HomePage() {
     const { active } = event;
     const activeId = String(active.id);
 
-    // Only track card drags for overlay
-    if (!isColumnId(activeId)) {
+    if (isColumnId(activeId)) {
+      setIsDraggingColumn(true);
+      const column = selectedBoard?.columns.find((c) => c.id === activeId);
+      setActiveColumn(column || null);
+    } else {
+      // Only track card drags for overlay
       const column = findColumnContainingCard(activeId);
       const card = column?.cards.find((c) => c.id === activeId);
       setActiveCard(card || null);
@@ -160,12 +204,23 @@ export default function HomePage() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveCard(null);
+    setActiveColumn(null);
+    setIsDraggingColumn(false);
     const { active, over } = event;
 
     if (!over || !selectedBoard) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
+
+    // Handle column deletion
+    if (isColumnId(activeId) && overId === "delete-zone") {
+      const column = selectedBoard.columns.find((c) => c.id === activeId);
+      if (column) {
+        setColumnToDelete(column);
+      }
+      return;
+    }
 
     // Handle column reordering
     if (isColumnId(activeId)) {
@@ -186,7 +241,7 @@ export default function HomePage() {
       };
 
       setAppData(newData);
-      saveAppData(newData);
+      handleSave(newData);
       return;
     }
 
@@ -238,7 +293,7 @@ export default function HomePage() {
       };
 
       setAppData(newData);
-      saveAppData(newData);
+      handleSave(newData);
     } else {
       // Moving card to different column
       const sourceCards = activeColumn.cards.filter((c) => c.id !== activeId);
@@ -273,7 +328,7 @@ export default function HomePage() {
       };
 
       setAppData(newData);
-      saveAppData(newData);
+      handleSave(newData);
     }
   };
 
@@ -309,6 +364,7 @@ export default function HomePage() {
             strategy={horizontalListSortingStrategy}
           >
             <div className="flex gap-3 w-max">
+              <DeleteZone isVisible={isDraggingColumn} />
               {selectedBoard.columns.map((column) => (
                 <SortableColumn key={column.id} column={column} onNameChange={handleColumnNameChange} />
               ))}
@@ -316,10 +372,30 @@ export default function HomePage() {
             </div>
           </SortableContext>
           <DragOverlay>
-            {activeCard ? <Card title={activeCard.title} className="rotate-3 shadow-lg" /> : null}
+            {activeCard ? (
+              <Card title={activeCard.title} className="rotate-3 shadow-lg" />
+            ) : activeColumn ? (
+              <Column title={activeColumn.name} count={activeColumn.cards.length} className="rotate-2 shadow-xl">
+                {activeColumn.cards.map((card) => (
+                  <Card key={card.id} title={card.title} />
+                ))}
+              </Column>
+            ) : null}
           </DragOverlay>
         </DndContext>
       </main>
+
+      <ConfirmDialog
+        open={columnToDelete !== null}
+        onOpenChange={(open) => !open && setColumnToDelete(null)}
+        title={`Delete "${columnToDelete?.name}"?`}
+        description={
+          columnToDelete?.cards.length
+            ? `This will permanently delete this column and ${columnToDelete.cards.length} card${columnToDelete.cards.length === 1 ? "" : "s"}.`
+            : "This will permanently delete this empty column."
+        }
+        onConfirm={() => columnToDelete && handleDeleteColumn(columnToDelete.id)}
+      />
     </div>
   );
 }

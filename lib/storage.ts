@@ -1,6 +1,56 @@
-import { AppData, BoardData } from "./types";
+import { AppData, BoardData, ColumnData, CardData, Priority } from "./types";
 
 const STORAGE_KEY = "kanbanned-data";
+
+const VALID_PRIORITIES: Priority[] = ["low", "medium", "high"];
+
+function isValidPriority(value: unknown): value is Priority {
+  return typeof value === "string" && VALID_PRIORITIES.includes(value as Priority);
+}
+
+function isValidCard(card: unknown): card is CardData {
+  if (typeof card !== "object" || card === null) return false;
+  const c = card as Record<string, unknown>;
+  return (
+    typeof c.id === "string" &&
+    typeof c.title === "string" &&
+    typeof c.description === "string" &&
+    isValidPriority(c.priority)
+  );
+}
+
+function isValidColumn(column: unknown): column is ColumnData {
+  if (typeof column !== "object" || column === null) return false;
+  const col = column as Record<string, unknown>;
+  return (
+    typeof col.id === "string" &&
+    typeof col.name === "string" &&
+    Array.isArray(col.cards) &&
+    col.cards.every(isValidCard)
+  );
+}
+
+function isValidBoard(board: unknown): board is BoardData {
+  if (typeof board !== "object" || board === null) return false;
+  const b = board as Record<string, unknown>;
+  return (
+    typeof b.id === "string" &&
+    typeof b.name === "string" &&
+    (b.emoji === undefined || typeof b.emoji === "string") &&
+    Array.isArray(b.columns) &&
+    b.columns.every(isValidColumn)
+  );
+}
+
+function isValidAppData(data: unknown): data is AppData {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return (
+    typeof d.version === "number" &&
+    Array.isArray(d.boards) &&
+    d.boards.every(isValidBoard)
+  );
+}
 
 export const defaultBoard: BoardData = {
   id: "default-board",
@@ -97,19 +147,37 @@ export function loadAppData(): AppData {
     if (!stored) {
       return defaultAppData;
     }
-    const parsed = JSON.parse(stored) as AppData;
-    if (!parsed.boards || parsed.boards.length === 0) {
+    const parsed = JSON.parse(stored);
+    if (!isValidAppData(parsed)) {
+      console.warn("Invalid app data structure in localStorage, using defaults");
+      return defaultAppData;
+    }
+    if (parsed.boards.length === 0) {
       return defaultAppData;
     }
     return parsed;
-  } catch {
+  } catch (error) {
+    console.error("Failed to load app data:", error);
     return defaultAppData;
   }
 }
 
-export function saveAppData(data: AppData): void {
+export type SaveResult = { success: true } | { success: false; error: "quota_exceeded" | "unknown" };
+
+export function saveAppData(data: AppData): SaveResult {
   if (typeof window === "undefined") {
-    return;
+    return { success: true };
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return { success: true };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "QuotaExceededError") {
+      console.error("localStorage quota exceeded. Unable to save data.");
+      return { success: false, error: "quota_exceeded" };
+    }
+    console.error("Failed to save app data:", error);
+    return { success: false, error: "unknown" };
+  }
 }

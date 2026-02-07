@@ -13,6 +13,10 @@ A free, offline-first Kanban board that works entirely in your browser. No sign-
 - **Works offline** — Full PWA support with service worker caching
 - **No account needed** — Data stored locally in your browser
 
+## Projects
+
+- **Kanbanned** — Free, offline-first Kanban board that works entirely in your browser.
+
 ## Getting Started
 
 ```bash
